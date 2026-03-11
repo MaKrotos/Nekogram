@@ -9,14 +9,12 @@ public class UserPrompt {
     private String promptText;
     private long updatedTime;
     private String category;
-    private boolean isEnabled;
 
     public UserPrompt() {
         this.userId = 0;
         this.promptText = "";
         this.updatedTime = System.currentTimeMillis();
         this.category = "default";
-        this.isEnabled = true;
     }
 
     public UserPrompt(long userId, String promptText) {
@@ -24,7 +22,6 @@ public class UserPrompt {
         this.promptText = promptText;
         this.updatedTime = System.currentTimeMillis();
         this.category = "default";
-        this.isEnabled = true;
     }
 
     public JSONObject toJson() {
@@ -34,7 +31,6 @@ public class UserPrompt {
             json.put("promptText", promptText);
             json.put("updatedTime", updatedTime);
             json.put("category", category);
-            json.put("isEnabled", isEnabled);
         } catch (JSONException e) {
             FileLog.e("UserPrompt toJson error: " + e.getMessage());
         }
@@ -48,7 +44,6 @@ public class UserPrompt {
             prompt.promptText = json.optString("promptText", "");
             prompt.updatedTime = json.optLong("updatedTime", System.currentTimeMillis());
             prompt.category = json.optString("category", "default");
-            prompt.isEnabled = json.optBoolean("isEnabled", true);
         } catch (Exception e) {
             FileLog.e("UserPrompt fromJson error: " + e.getMessage());
         }
@@ -85,11 +80,4 @@ public class UserPrompt {
         this.category = category;
     }
 
-    public boolean isEnabled() {
-        return isEnabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        isEnabled = enabled;
-    }
 }

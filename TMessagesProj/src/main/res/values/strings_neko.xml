@@ -309,7 +309,8 @@
     <string name="CloudflareAccountID">Account ID</string>
     <string name="CloudflareAPIToken">API Token</string>
     <string name="CloudflareCredentialsDialog">Configure Cloudflare Account ID and API Token.\n**How to obtain?**</string>
-    <string name="OpenAIAPIKey">OpenAI API Key</string>
+    <string name="OpenAIAPIKey">OpenAI API Key</string>\
+    <string name="OpenAIBasicPropmpt">Basic prompt Open AI</string>
     <string name="PreferOriginalQuality">Prefer original quality</string>
     <string name="PreferOriginalQualityDesc">View videos in original quality.</string>
     <string name="AutoInlineBot">Auto inline bot</string>

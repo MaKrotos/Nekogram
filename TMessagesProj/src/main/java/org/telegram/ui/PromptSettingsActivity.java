@@ -122,7 +122,6 @@ public class PromptSettingsActivity extends BaseFragment implements Notification
                 TextCheckCell checkCell = (TextCheckCell) view;
                 long currentUserId = UserConfig.getInstance(currentAccount).getClientUserId();
                 boolean newState = !checkCell.isChecked();
-                UserPromptService.getInstance(currentAccount).setPromptEnabled(currentUserId, newState); // Исправлено: передаем currentAccount
                 checkCell.setChecked(newState);
             }
         });
@@ -207,12 +206,6 @@ public class PromptSettingsActivity extends BaseFragment implements Notification
                         textCell.setTextAndValue(LocaleController.getString("PromptText", R.string.PromptText),
                                 currentPromptText.isEmpty() ? LocaleController.getString("NotSet", R.string.NotSet) : currentPromptText,
                                 true);
-                    } else if (position == promptEnabledRow) {
-                        long currentUserId = UserConfig.getInstance(currentAccount).getClientUserId();
-                        boolean isEnabled = UserPromptService.getInstance(currentAccount).getUserPrompt(currentUserId) != null ?
-                                UserPromptService.getInstance(currentAccount).getUserPrompt(currentUserId).isEnabled() : true;
-                        TextCheckCell checkCell = (TextCheckCell) holder.itemView;
-                        checkCell.setTextAndCheck(LocaleController.getString("PromptEnabled", R.string.PromptEnabled), isEnabled, true);
                     }
                     break;
                 }

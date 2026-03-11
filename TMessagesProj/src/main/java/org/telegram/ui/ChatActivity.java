@@ -1640,7 +1640,10 @@ public class ChatActivity extends BaseFragment implements
 
     private final static int chat_menu_topic_create = 73;
 
+
+
     private final static int id_chat_compose_panel = 1000;
+    private final static int magic = 1001;
 
     RecyclerListView.OnItemLongClickListenerExtended onItemLongClickListener = new RecyclerListView.OnItemLongClickListenerExtended() {
         @Override
@@ -4219,8 +4222,13 @@ public class ChatActivity extends BaseFragment implements
                 } else if (id == chat_menu_topic_create) {
                     presentFragment(TopicCreateFragment.create(-dialog_id, 0).setOpenInChatActivity(ChatActivity.this));
                 }
+                else if (id == magic)
+                {
+                    showMagicOptions();
+                }
             }
         });
+
         View backButton = actionBar.getBackButton();
         backButton.setOnTouchListener(new LongPressListenerWithMovingGesture() {
             @Override
@@ -10307,14 +10315,6 @@ public class ChatActivity extends BaseFragment implements
                 if (NekoConfig.showNoQuoteForward) actionModeViews.add(actionMode.addItemWithWidth(ForwardItem.ID_FORWARD_NOQUOTE, R.drawable.msg_forward, AndroidUtilities.dp(54), LocaleController.getString(R.string.NoQuoteForward)));
             }
 
-            // === НОВАЯ КНОПКА MAGIC ===
-            int MAGIC_ACTION_ID = 9999;
-            magicItem = actionMode.addItemWithWidth(MAGIC_ACTION_ID, R.drawable.ic_ab_magic, AndroidUtilities.dp(54), "Magic");
-            actionModeViews.add(magicItem);
-            magicItem.setOnClickListener(v -> {
-                showMagicOptions();
-            });
-            // =========================
 
             actionModeViews.add(actionMode.addItemWithWidth(share, R.drawable.msg_shareout, AndroidUtilities.dp(54), LocaleController.getString(R.string.ShareFile)));
             actionModeViews.add(actionMode.addItemWithWidth(delete, R.drawable.msg_delete, AndroidUtilities.dp(54), LocaleController.getString(R.string.Delete)));
@@ -10325,6 +10325,9 @@ public class ChatActivity extends BaseFragment implements
             actionModeViews.add(actionMode.addItemWithWidth(delete, R.drawable.msg_delete, AndroidUtilities.dp(54), LocaleController.getString(R.string.Delete)));
         }
 
+        actionModeViews.add(actionMode.addItemWithWidth(magic, R.drawable.ic_ab_magic, AndroidUtilities.dp(54), LocaleController.getString(R.string.magic)));
+
+
         actionMode.setItemVisibility(edit, canEditMessagesCount == 1 && selectedMessagesIds[0].size() + selectedMessagesIds[1].size() == 1 ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(copy, !isPeerNoForwards() && selectedMessagesCanCopyIds[0].size() + selectedMessagesCanCopyIds[1].size() != 0 ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(star, selectedMessagesCanStarIds[0].size() + selectedMessagesCanStarIds[1].size() != 0 ? View.VISIBLE : View.GONE);
@@ -10332,10 +10335,6 @@ public class ChatActivity extends BaseFragment implements
         actionMode.setItemVisibility(tag_message, getUserConfig().isPremium() ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(share, View.GONE);
 
-        // Скрываем кнопку Magic по умолчанию, показываем только если есть выбранные сообщения
-        if (magicItem != null) {
-            magicItem.setVisibility(selectedMessagesIds[0].size() + selectedMessagesIds[1].size() > 0 ? View.VISIBLE : View.GONE);
-        }
     }
     private void hideTagSelector() {
         if (tagSelector == null) return;
@@ -45637,12 +45636,15 @@ public class ChatActivity extends BaseFragment implements
         // Собираем выбранные сообщения
         ArrayList<MessageObject> selectedMessages = new ArrayList<>();
 
-        for (int i = 0; i < selectedMessagesIds[0].size(); i++) {
-            selectedMessages.add(selectedMessagesIds[0].valueAt(i));
-        }
-
-        for (int i = 0; i < selectedMessagesIds[1].size(); i++) {
-            selectedMessages.add(selectedMessagesIds[1].valueAt(i));
+        for (SparseArray<MessageObject> messageArray : selectedMessagesIds) {
+            if (messageArray != null) {
+                for (int i = 0; i < messageArray.size(); i++) {
+                    MessageObject message = messageArray.valueAt(i);
+                    if (message != null) {
+                        selectedMessages.add(message);
+                    }
+                }
+            }
         }
 
         if (selectedMessages.isEmpty()) {

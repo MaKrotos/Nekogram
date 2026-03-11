@@ -10552,5 +10552,6 @@
     <string name="ClearPrompt">Clear prompt</string>
     <string name="ClearPromptConfirm">Are you sure you want to clear the prompt for this user?</string>
     <string name="PromptForUser">Prompt for %1$s</string>
+    <string name="magic">Magic</string>
 
 </resources>

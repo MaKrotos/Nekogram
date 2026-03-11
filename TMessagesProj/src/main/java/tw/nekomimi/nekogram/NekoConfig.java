@@ -93,6 +93,7 @@ public class NekoConfig {
     public static String cfAccountID = "";
     public static String cfApiToken = "";
     public static String openaiApiKey = "";
+    public static String OpenAIBasicPropmpt = "";
 
     public static boolean showAddToSavedMessages = true;
     public static boolean showSetReminder = false;
@@ -237,6 +238,7 @@ public class NekoConfig {
             cfAccountID = preferences.getString("cfAccountID", "");
             cfApiToken = preferences.getString("cfApiToken", "");
             openaiApiKey = preferences.getString("openaiApiKey", "");
+            OpenAIBasicPropmpt = preferences.getString("OpenAIBasicPropmpt", "");
             preferOriginalQuality = preferences.getBoolean("preferOriginalQuality", false);
             autoInlineBot = preferences.getBoolean("autoInlineBot", false);
             forceFontWeightFallback = preferences.getBoolean("forceFontWeightFallback", false);
@@ -344,6 +346,14 @@ public class NekoConfig {
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putString("openaiApiKey", openaiApiKey);
+        editor.apply();
+    }
+
+    public static void setOpenAIBasicPropmpt(String apiKey) {
+        OpenAIBasicPropmpt = apiKey;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString("OpenAIBasicPropmpt", OpenAIBasicPropmpt);
         editor.apply();
     }
 

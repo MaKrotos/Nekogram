@@ -133,7 +133,7 @@ public class UserPromptService extends BaseController {
      */
     public boolean hasPrompt(long userId) {
         UserPrompt prompt = promptsCache.get(userId);
-        return prompt != null && !prompt.getPromptText().isEmpty() && prompt.isEnabled();
+        return prompt != null && !prompt.getPromptText().isEmpty();
     }
 
     /**
@@ -157,16 +157,6 @@ public class UserPromptService extends BaseController {
         return result;
     }
 
-    /**
-     * Включить/выключить промпт
-     */
-    public void setPromptEnabled(long userId, boolean enabled) {
-        UserPrompt prompt = promptsCache.get(userId);
-        if (prompt != null) {
-            prompt.setEnabled(enabled);
-            saveAllPrompts();
-        }
-    }
 
     /**
      * Поиск промптов по тексту

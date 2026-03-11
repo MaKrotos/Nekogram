@@ -93,8 +93,12 @@ public class ConfigHelper extends BaseRemoteHelper {
     }
 
     public static List<News> getNewsForSettings() {
-        return getNews()
-                .stream()
+        List<News> newsList = getNews();
+        if (newsList == null) {
+            return new ArrayList<>(); // или Collections.emptyList()
+        }
+
+        return newsList.stream()
                 .filter(news -> news.type == TYPE_NEWS || news.type == TYPE_PROXY)
                 .filter(news -> news.id == null || !preferences.getBoolean("news_dismissed_" + news.id, false))
                 .toList();
