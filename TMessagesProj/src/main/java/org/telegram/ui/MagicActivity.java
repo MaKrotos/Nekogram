@@ -1,9 +1,16 @@
 package org.telegram.ui;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -21,6 +28,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.RadialProgressView;
 
 import java.util.ArrayList;
 
@@ -33,6 +41,8 @@ public class MagicActivity extends BaseFragment {
     private TextView loadingTextView;
     private TextView errorTextView;
     private View noApiKeyView;
+    private RadialProgressView progressView;
+    private FrameLayout progressContainer;
 
     public MagicActivity() {
         super();
@@ -80,54 +90,93 @@ public class MagicActivity extends BaseFragment {
                 FrameLayout.LayoutParams.WRAP_CONTENT
         ));
 
-        // Заголовок
+        // Заголовок с анимацией градиента
         TextView titleView = new TextView(context);
         titleView.setText("✨ Магия AI ✨");
         titleView.setTextSize(24);
         titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         titleView.setGravity(Gravity.CENTER);
         titleView.setPadding(0, 0, 0, AndroidUtilities.dp(10));
+        titleView.setAlpha(0f);
+        titleView.setTranslationY(-AndroidUtilities.dp(20));
         contentLayout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         // Информация о количестве выбранных сообщений
         TextView countView = new TextView(context);
-        countView.setText("Выбрано сообщений: " + selectedMessages.size());
-        countView.setTextSize(16);
+        countView.setText(LocaleController.formatString("SelectedMessages", R.string.SelectedMessages, selectedMessages.size()));
+        countView.setTextSize(14);
         countView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         countView.setGravity(Gravity.CENTER);
         countView.setPadding(0, 0, 0, AndroidUtilities.dp(5));
+        countView.setAlpha(0f);
+        countView.setTranslationY(-AndroidUtilities.dp(20));
         contentLayout.addView(countView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         // Информация о промпте
         if (promptText != null && !promptText.isEmpty()) {
+            FrameLayout promptContainer = new FrameLayout(context);
+            promptContainer.setBackgroundDrawable(Theme.createRoundRectDrawable(
+                    AndroidUtilities.dp(12),
+                    Theme.getColor(Theme.key_windowBackgroundWhite)
+            ));
+            promptContainer.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12),
+                    AndroidUtilities.dp(16), AndroidUtilities.dp(12));
+
+            LinearLayout.LayoutParams promptContainerParams = LayoutHelper.createLinear(
+                    LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
+                    Gravity.CENTER, 20, 10, 20, 15
+            );
+            contentLayout.addView(promptContainer, promptContainerParams);
+
+            TextView promptIcon = new TextView(context);
+            promptIcon.setText("📝");
+            promptIcon.setTextSize(16);
+            promptContainer.addView(promptIcon, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+
             TextView promptView = new TextView(context);
-            promptView.setText("📝 " + promptText);
+            promptView.setText(promptText);
             promptView.setTextSize(14);
-            promptView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
-            promptView.setGravity(Gravity.CENTER);
+            promptView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             promptView.setMaxLines(3);
             promptView.setEllipsize(TextUtils.TruncateAt.END);
-            promptView.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(10), AndroidUtilities.dp(20), AndroidUtilities.dp(15));
-            contentLayout.addView(promptView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+            promptView.setPadding(AndroidUtilities.dp(28), 0, 0, 0);
+            promptContainer.addView(promptView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+
+            promptContainer.setAlpha(0f);
+            promptContainer.setTranslationX(-AndroidUtilities.dp(20));
         }
 
         // View для отображения отсутствия API ключа
         noApiKeyView = createNoApiKeyView(context);
         contentLayout.addView(noApiKeyView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 20, 20, 20, 0));
+        noApiKeyView.setAlpha(0f);
+        noApiKeyView.setScaleX(0.9f);
+        noApiKeyView.setScaleY(0.9f);
+
+        // Контейнер для прогресса
+        progressContainer = new FrameLayout(context);
+        progressContainer.setVisibility(View.GONE);
+        contentLayout.addView(progressContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 100));
+
+        // RadialProgressView для загрузки
+        progressView = new RadialProgressView(context);
+        progressView.setSize(AndroidUtilities.dp(40));
+        progressView.setProgressColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        progressContainer.addView(progressView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         // TextView для загрузки
         loadingTextView = new TextView(context);
-        loadingTextView.setText("🤔 Думаю...");
-        loadingTextView.setTextSize(18);
-        loadingTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        loadingTextView.setText(LocaleController.getString("Thinking", R.string.Thinking));
+        loadingTextView.setTextSize(15);
+        loadingTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         loadingTextView.setGravity(Gravity.CENTER);
-        loadingTextView.setPadding(0, AndroidUtilities.dp(30), 0, 0);
+        loadingTextView.setPadding(0, AndroidUtilities.dp(70), 0, 0);
         loadingTextView.setVisibility(View.GONE);
-        contentLayout.addView(loadingTextView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        progressContainer.addView(loadingTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
         // TextView для ошибок
         errorTextView = new TextView(context);
-        errorTextView.setTextSize(16);
+        errorTextView.setTextSize(15);
         errorTextView.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
         errorTextView.setGravity(Gravity.CENTER);
         errorTextView.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(30), AndroidUtilities.dp(20), 0);
@@ -140,6 +189,9 @@ public class MagicActivity extends BaseFragment {
         suggestionsContainer.setVisibility(View.GONE);
         contentLayout.addView(suggestionsContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
+        // Запускаем анимацию появления
+        animateViewsIn(titleView, countView, promptText != null && !promptText.isEmpty() ? ((FrameLayout) contentLayout.getChildAt(3)) : null);
+
         // Запускаем генерацию при создании представления
         if (!selectedMessages.isEmpty()) {
             checkAndGenerateSuggestions();
@@ -148,20 +200,85 @@ public class MagicActivity extends BaseFragment {
         return fragmentView;
     }
 
+    private void animateViewsIn(View titleView, View countView, View promptContainer) {
+        // Анимация заголовка
+        titleView.animate()
+                .alpha(1f)
+                .translationY(0)
+                .setDuration(300)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+
+        // Анимация счетчика
+        countView.animate()
+                .alpha(1f)
+                .translationY(0)
+                .setDuration(300)
+                .setStartDelay(100)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+
+        // Анимация промпт контейнера
+        if (promptContainer != null) {
+            promptContainer.animate()
+                    .alpha(1f)
+                    .translationX(0)
+                    .setDuration(350)
+                    .setStartDelay(200)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        }
+
+        // Анимация noApiKeyView (если видим)
+        if (noApiKeyView.getVisibility() == View.VISIBLE) {
+            noApiKeyView.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(350)
+                    .setStartDelay(250)
+                    .setInterpolator(new OvershootInterpolator(1.2f))
+                    .start();
+        }
+    }
+
     private View createNoApiKeyView(Context context) {
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(12),
+                AndroidUtilities.dp(16),
                 Theme.getColor(Theme.key_windowBackgroundWhite)
         ));
         layout.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(20),
                 AndroidUtilities.dp(20), AndroidUtilities.dp(20));
         layout.setVisibility(openAIService.hasApiKey() ? View.GONE : View.VISIBLE);
 
+        // Иконка с анимацией пульсации
+        FrameLayout iconContainer = new FrameLayout(context);
+        TextView iconView = new TextView(context);
+        iconView.setText("🔑");
+        iconView.setTextSize(32);
+        iconContainer.addView(iconView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+        layout.addView(iconContainer, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 0, 0, 0, 10));
+
+        // Запускаем анимацию пульсации для иконки
+        iconView.post(() -> {
+            ObjectAnimator pulseAnim = ObjectAnimator.ofFloat(iconView, "scaleX", 1f, 1.1f, 1f);
+            pulseAnim.setDuration(1500);
+            pulseAnim.setRepeatCount(ValueAnimator.INFINITE);
+            pulseAnim.setInterpolator(new AccelerateDecelerateInterpolator());
+            pulseAnim.start();
+
+            ObjectAnimator pulseAnimY = ObjectAnimator.ofFloat(iconView, "scaleY", 1f, 1.1f, 1f);
+            pulseAnimY.setDuration(1500);
+            pulseAnimY.setRepeatCount(ValueAnimator.INFINITE);
+            pulseAnimY.setInterpolator(new AccelerateDecelerateInterpolator());
+            pulseAnimY.start();
+        });
+
         TextView titleView = new TextView(context);
-        titleView.setText("🔑 API ключ не найден");
-        titleView.setTextSize(18);
+        titleView.setText(LocaleController.getString("ApiKeyNotFound", R.string.ApiKeyNotFound));
+        titleView.setTextSize(16);
         titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         titleView.setGravity(Gravity.CENTER);
         titleView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
@@ -169,21 +286,21 @@ public class MagicActivity extends BaseFragment {
         layout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         TextView descView = new TextView(context);
-        descView.setText("Для использования магии AI необходимо добавить OpenAI API ключ в настройках.");
+        descView.setText(LocaleController.getString("ApiKeyNotFoundDesc", R.string.ApiKeyNotFoundDesc));
         descView.setTextSize(14);
         descView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         descView.setGravity(Gravity.CENTER);
-        descView.setPadding(0, 0, 0, AndroidUtilities.dp(16));
+        descView.setPadding(0, 0, 0, AndroidUtilities.dp(20));
         layout.addView(descView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        // Кнопка перехода в настройки
+        // Кнопка перехода в настройки с анимацией нажатия
         FrameLayout settingsButton = new FrameLayout(context);
         settingsButton.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(8),
+                AndroidUtilities.dp(10),
                 Theme.getColor(Theme.key_featuredStickers_addButton)
         ));
-        settingsButton.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(10),
-                AndroidUtilities.dp(16), AndroidUtilities.dp(10));
+        settingsButton.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(12),
+                AndroidUtilities.dp(20), AndroidUtilities.dp(12));
 
         LinearLayout.LayoutParams buttonParams = LayoutHelper.createLinear(
                 LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT,
@@ -192,18 +309,28 @@ public class MagicActivity extends BaseFragment {
         layout.addView(settingsButton, buttonParams);
 
         TextView buttonText = new TextView(context);
-        buttonText.setText("⚙️ Перейти в настройки");
-        buttonText.setTextSize(14);
+        buttonText.setText(LocaleController.getString("GoToSettings", R.string.GoToSettings));
+        buttonText.setTextSize(15);
         buttonText.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
         buttonText.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         settingsButton.addView(buttonText, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         settingsButton.setOnClickListener(v -> {
+            // Анимация нажатия
+            v.animate()
+                    .scaleX(0.95f)
+                    .scaleY(0.95f)
+                    .setDuration(100)
+                    .withEndAction(() -> v.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start())
+                    .start();
+
             // Закрываем текущий фрагмент и открываем настройки
             finishFragment();
-            // TODO: Открыть нужный раздел настроек
-            // Например: presentFragment(new SettingsActivity());
-            Toast.makeText(context, "Откройте настройки и добавьте API ключ", Toast.LENGTH_LONG).show();
+            Toast.makeText(context, LocaleController.getString("OpenSettingsToast", R.string.OpenSettingsToast), Toast.LENGTH_LONG).show();
         });
 
         return layout;
@@ -211,9 +338,17 @@ public class MagicActivity extends BaseFragment {
 
     private void checkAndGenerateSuggestions() {
         if (!openAIService.hasApiKey()) {
-            // Показываем сообщение об отсутствии ключа
+            // Показываем сообщение об отсутствии ключа с анимацией
             noApiKeyView.setVisibility(View.VISIBLE);
-            loadingTextView.setVisibility(View.GONE);
+            noApiKeyView.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(350)
+                    .setInterpolator(new OvershootInterpolator(1.2f))
+                    .start();
+
+            progressContainer.setVisibility(View.GONE);
             suggestionsContainer.setVisibility(View.GONE);
             errorTextView.setVisibility(View.GONE);
             return;
@@ -224,52 +359,93 @@ public class MagicActivity extends BaseFragment {
     }
 
     private void generateSuggestions() {
+        progressContainer.setVisibility(View.VISIBLE);
+        progressContainer.setAlpha(0f);
+        progressContainer.animate()
+                .alpha(1f)
+                .setDuration(200)
+                .start();
+
         loadingTextView.setVisibility(View.VISIBLE);
         suggestionsContainer.setVisibility(View.GONE);
+        suggestionsContainer.setAlpha(0f);
         errorTextView.setVisibility(View.GONE);
         suggestionsContainer.removeAllViews();
+
+        // Анимация вращения прогресса
+        progressView.setProgress(0f);
+        ValueAnimator progressAnim = ValueAnimator.ofFloat(0f, 1f);
+        progressAnim.setDuration(2000);
+        progressAnim.setRepeatCount(ValueAnimator.INFINITE);
+        progressAnim.addUpdateListener(animation -> {
+            float progress = (float) animation.getAnimatedValue();
+            progressView.setProgress(progress);
+        });
+        progressAnim.start();
 
         openAIService.generateSuggestions(selectedMessages, promptText, new OpenAIService.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 AndroidUtilities.runOnUIThread(() -> {
-                    try {
-                        loadingTextView.setVisibility(View.GONE);
-                        suggestionsContainer.setVisibility(View.VISIBLE);
-                        errorTextView.setVisibility(View.GONE);
-
-                        // Добавляем объяснение, если есть
-                        if (response.has("explanation")) {
-                            addExplanationView(response.getString("explanation"));
-                        }
-
-                        // Добавляем предложения
-                        if (response.has("suggestions")) {
-                            JSONArray suggestions = response.getJSONArray("suggestions");
-                            for (int i = 0; i < suggestions.length(); i++) {
-                                JSONObject suggestion = suggestions.getJSONObject(i);
-                                addSuggestionView(
-                                        suggestion.getString("text"),
-                                        suggestion.getString("type"),
-                                        suggestion.getDouble("confidence"),
-                                        i
-                                );
-                            }
-                        }
-
-                    } catch (Exception e) {
-                        showError("Ошибка при обработке ответа: " + e.getMessage());
-                    }
+                    progressAnim.cancel();
+                    handleSuccess(response);
                 });
             }
 
             @Override
             public void onError(String error) {
                 AndroidUtilities.runOnUIThread(() -> {
+                    progressAnim.cancel();
                     showError(error);
                 });
             }
         });
+    }
+
+    private void handleSuccess(JSONObject response) {
+        try {
+            // Анимация скрытия прогресса
+            progressContainer.animate()
+                    .alpha(0f)
+                    .setDuration(200)
+                    .withEndAction(() -> progressContainer.setVisibility(View.GONE))
+                    .start();
+
+            suggestionsContainer.setVisibility(View.VISIBLE);
+            suggestionsContainer.setAlpha(0f);
+            suggestionsContainer.setTranslationY(AndroidUtilities.dp(30));
+
+            // Добавляем объяснение, если есть
+            if (response.has("explanation")) {
+                addExplanationView(response.getString("explanation"));
+            }
+
+            // Добавляем предложения
+            if (response.has("suggestions")) {
+                JSONArray suggestions = response.getJSONArray("suggestions");
+                for (int i = 0; i < suggestions.length(); i++) {
+                    JSONObject suggestion = suggestions.getJSONObject(i);
+                    addSuggestionView(
+                            suggestion.getString("text"),
+                            suggestion.getString("type"),
+                            suggestion.getDouble("confidence"),
+                            i,
+                            suggestions.length()
+                    );
+                }
+            }
+
+            // Анимация появления контейнера с предложениями
+            suggestionsContainer.animate()
+                    .alpha(1f)
+                    .translationY(0)
+                    .setDuration(300)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+
+        } catch (Exception e) {
+            showError(LocaleController.getString("ResponseProcessingError", R.string.ResponseProcessingError) + ": " + e.getMessage());
+        }
     }
 
     private void addExplanationView(String explanation) {
@@ -279,15 +455,15 @@ public class MagicActivity extends BaseFragment {
         LinearLayout explanationLayout = new LinearLayout(context);
         explanationLayout.setOrientation(LinearLayout.HORIZONTAL);
         explanationLayout.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(12),
+                AndroidUtilities.dp(14),
                 Theme.getColor(Theme.key_windowBackgroundWhite)
         ));
-        explanationLayout.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16),
-                AndroidUtilities.dp(16), AndroidUtilities.dp(16));
+        explanationLayout.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14),
+                AndroidUtilities.dp(16), AndroidUtilities.dp(14));
 
         LinearLayout.LayoutParams layoutParams = LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
-                Gravity.CENTER, 16, 16, 16, 8
+                Gravity.CENTER, 16, 8, 16, 8
         );
         suggestionsContainer.addView(explanationLayout, layoutParams);
 
@@ -304,24 +480,35 @@ public class MagicActivity extends BaseFragment {
         explanationView.setMaxLines(3);
         explanationView.setEllipsize(TextUtils.TruncateAt.END);
         explanationLayout.addView(explanationView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+
+        // Анимация появления
+        explanationLayout.setAlpha(0f);
+        explanationLayout.setTranslationX(-AndroidUtilities.dp(20));
+        explanationLayout.animate()
+                .alpha(1f)
+                .translationX(0)
+                .setDuration(300)
+                .setStartDelay(100)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
     }
 
-    private void addSuggestionView(String text, String type, double confidence, int index) {
+    private void addSuggestionView(String text, String type, double confidence, int index, int totalCount) {
         Context context = getParentActivity();
         if (context == null) return;
 
         LinearLayout suggestionCard = new LinearLayout(context);
         suggestionCard.setOrientation(LinearLayout.VERTICAL);
         suggestionCard.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(12),
+                AndroidUtilities.dp(14),
                 Theme.getColor(Theme.key_windowBackgroundWhite)
         ));
         suggestionCard.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(16),
-                AndroidUtilities.dp(16), AndroidUtilities.dp(12));
+                AndroidUtilities.dp(16), AndroidUtilities.dp(14));
 
         LinearLayout.LayoutParams cardParams = LayoutHelper.createLinear(
                 LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT,
-                Gravity.CENTER, 16, index == 0 ? 8 : 4, 16, 4
+                Gravity.CENTER, 16, index == 0 ? 4 : 2, 16, 2
         );
         suggestionsContainer.addView(suggestionCard, cardParams);
 
@@ -332,114 +519,187 @@ public class MagicActivity extends BaseFragment {
 
         String typeEmoji;
         String typeText;
+        int typeColor;
         switch (type) {
             case "question":
                 typeEmoji = "❓";
-                typeText = "Вопрос";
+                typeText = LocaleController.getString("Question", R.string.Question);
+                typeColor = Theme.getColor(Theme.key_chat_messageLinkIn);
                 break;
             case "continuation":
                 typeEmoji = "➡️";
-                typeText = "Продолжение";
+                typeText = LocaleController.getString("Continuation", R.string.Continuation);
+                typeColor = Theme.getColor(Theme.key_chat_messageLinkIn);
                 break;
             default:
                 typeEmoji = "💬";
-                typeText = "Ответ";
+                typeText = LocaleController.getString("Reply", R.string.Reply);
+                typeColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText);
         }
 
         TextView typeView = new TextView(context);
         typeView.setText(typeEmoji + " " + typeText);
         typeView.setTextSize(14);
-        typeView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        typeView.setTextColor(typeColor);
         typeView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         topRow.addView(typeView, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1.0f));
 
+        // Индикатор уверенности с цветом
+        int confidenceColor;
+        if (confidence >= 0.8) {
+            confidenceColor = 0xFF4CAF50;
+        } else if (confidence >= 0.5) {
+            confidenceColor = 0xFFFF9800;
+        } else {
+            confidenceColor = 0xFFF44336;
+        }
+
         TextView confidenceView = new TextView(context);
-        confidenceView.setText((int)(confidence * 100) + "%");
-        confidenceView.setTextSize(14);
-        confidenceView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        confidenceView.setText((int) (confidence * 100) + "%");
+        confidenceView.setTextSize(13);
+        confidenceView.setTextColor(confidenceColor);
+        confidenceView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         topRow.addView(confidenceView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
         // Текст предложения
         TextView messageText = new TextView(context);
         messageText.setText(text);
-        messageText.setTextSize(16);
+        messageText.setTextSize(15);
         messageText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-        messageText.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        messageText.setPadding(0, AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10));
         messageText.setLineSpacing(AndroidUtilities.dp(2), 1.0f);
         suggestionCard.addView(messageText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        // Разделитель
+        View divider = new View(context);
+        divider.setBackgroundColor(Theme.getColor(Theme.key_divider));
+        LinearLayout.LayoutParams dividerParams = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 0, 0, 0, 10);
+        dividerParams.topMargin = AndroidUtilities.dp(4);
+        suggestionCard.addView(divider, dividerParams);
 
         // Нижняя строка с кнопками
         LinearLayout bottomRow = new LinearLayout(context);
         bottomRow.setOrientation(LinearLayout.HORIZONTAL);
-        bottomRow.setPadding(0, AndroidUtilities.dp(4), 0, 0);
+        bottomRow.setPadding(0, AndroidUtilities.dp(6), 0, 0);
         suggestionCard.addView(bottomRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         // Кнопка копирования
-        FrameLayout copyButton = new FrameLayout(context);
-        copyButton.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(8),
-                Theme.getColor(Theme.key_featuredStickers_addButton)
-        ));
-        copyButton.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(6),
-                AndroidUtilities.dp(12), AndroidUtilities.dp(6));
-
-        LinearLayout.LayoutParams copyButtonParams = LayoutHelper.createLinear(
-                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT,
-                Gravity.LEFT | Gravity.CENTER_VERTICAL
-        );
-        copyButtonParams.rightMargin = AndroidUtilities.dp(8);
-        bottomRow.addView(copyButton, copyButtonParams);
-
-        TextView copyText = new TextView(context);
-        copyText.setText("📋 Копировать");
-        copyText.setTextSize(14);
-        copyText.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        copyText.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
-        copyButton.addView(copyText, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+        FrameLayout copyButton = createActionButton(context, "📋", LocaleController.getString("Copy", R.string.Copy), Theme.getColor(Theme.key_featuredStickers_addButton));
+        bottomRow.addView(copyButton, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1.0f, 0, 0, 4, 0));
 
         copyButton.setOnClickListener(v -> {
+            // Анимация нажатия
+            animateButtonPress(copyButton);
+
+            // Копирование текста
             android.content.ClipboardManager clipboard =
                     (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
             android.content.ClipData clip =
                     android.content.ClipData.newPlainText("suggested_message", text);
             clipboard.setPrimaryClip(clip);
 
-            Toast.makeText(context, "Текст скопирован", Toast.LENGTH_SHORT).show();
-
             // Визуальная обратная связь
-            copyButton.setAlpha(0.7f);
-            copyButton.postDelayed(() -> copyButton.setAlpha(1.0f), 200);
+            Toast.makeText(context, LocaleController.getString("TextCopied", R.string.TextCopied), Toast.LENGTH_SHORT).show();
+
+            // Анимация успешного копирования
+            copyButton.setBackgroundDrawable(Theme.createRoundRectDrawable(
+                    AndroidUtilities.dp(10),
+                    0xFF4CAF50
+            ));
+            copyButton.postDelayed(() -> {
+                copyButton.setBackgroundDrawable(Theme.createRoundRectDrawable(
+                        AndroidUtilities.dp(10),
+                        Theme.getColor(Theme.key_featuredStickers_addButton)
+                ));
+            }, 500);
         });
 
-        // Кнопка "Использовать" (можно будет потом реализовать отправку сообщения)
-        FrameLayout useButton = new FrameLayout(context);
-        useButton.setBackgroundDrawable(Theme.createRoundRectDrawable(
-                AndroidUtilities.dp(8),
-                Theme.getColor(Theme.key_windowBackgroundWhiteBlueText)
-        ));
-        useButton.setPadding(AndroidUtilities.dp(12), AndroidUtilities.dp(6),
-                AndroidUtilities.dp(12), AndroidUtilities.dp(6));
-
-        bottomRow.addView(useButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.CENTER_VERTICAL));
-
-        TextView useText = new TextView(context);
-        useText.setText("✏️ Использовать");
-        useText.setTextSize(14);
-        useText.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-        useText.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
-        useButton.addView(useText, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+        // Кнопка "Использовать"
+        FrameLayout useButton = createActionButton(context, "✏️", LocaleController.getString("Use", R.string.Use), Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        bottomRow.addView(useButton, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1.0f, 4, 0, 0, 0));
 
         useButton.setOnClickListener(v -> {
-            Toast.makeText(context, "Функция будет доступна позже", Toast.LENGTH_SHORT).show();
-            // TODO: Реализовать вставку сообщения в поле ввода
+            animateButtonPress(useButton);
+            Toast.makeText(context, LocaleController.getString("FeatureComingSoon", R.string.FeatureComingSoon), Toast.LENGTH_SHORT).show();
         });
+
+        // Анимация появления карточки
+        suggestionCard.setAlpha(0f);
+        suggestionCard.setTranslationY(AndroidUtilities.dp(30));
+        suggestionCard.animate()
+                .alpha(1f)
+                .translationY(0)
+                .setDuration(350)
+                .setStartDelay(150 + index * 100)
+                .setInterpolator(new OvershootInterpolator(1.1f))
+                .start();
+    }
+
+    private FrameLayout createActionButton(Context context, String emoji, String text, int backgroundColor) {
+        FrameLayout button = new FrameLayout(context);
+        button.setBackgroundDrawable(Theme.createRoundRectDrawable(
+                AndroidUtilities.dp(10),
+                backgroundColor
+        ));
+        button.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(8),
+                AndroidUtilities.dp(10), AndroidUtilities.dp(8));
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER);
+
+        TextView emojiView = new TextView(context);
+        emojiView.setText(emoji);
+        emojiView.setTextSize(14);
+        content.addView(emojiView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView textView = new TextView(context);
+        textView.setText(text);
+        textView.setTextSize(14);
+        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        textView.setPadding(AndroidUtilities.dp(4), 0, 0, 0);
+        content.addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+
+        button.addView(content, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+
+        return button;
+    }
+
+    private void animateButtonPress(View button) {
+        button.animate()
+                .scaleX(0.9f)
+                .scaleY(0.9f)
+                .setDuration(100)
+                .withEndAction(() -> button.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(100)
+                        .start())
+                .start();
     }
 
     private void showError(String error) {
-        loadingTextView.setVisibility(View.GONE);
+        progressContainer.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction(() -> progressContainer.setVisibility(View.GONE))
+                .start();
+
         suggestionsContainer.setVisibility(View.GONE);
         errorTextView.setVisibility(View.VISIBLE);
         errorTextView.setText("❌ " + error);
+        errorTextView.setAlpha(0f);
+        errorTextView.setScaleX(0.8f);
+        errorTextView.setScaleY(0.8f);
+
+        errorTextView.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(300)
+                .setInterpolator(new OvershootInterpolator())
+                .start();
     }
 
     public String getPromptText() {
