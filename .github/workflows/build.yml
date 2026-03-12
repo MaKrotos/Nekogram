@@ -13,61 +13,70 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Setup JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: 21
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Восстанавливаем keystore из base64
-      - name: Decode keystore
+      - name: Setup Google Services
         run: |
-          echo "🔐 Decoding keystore..."
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/keystore
-          ls -la $HOME/keystore
+          modules=("TMessagesProj" "TMessagesProj_App")
+          echo "${{ secrets.GOOGLE_SERVICES_BASE64 }}" | base64 --decode > /tmp/google-services.json
 
-      # Восстанавливаем google-services.json из base64
-      - name: Decode Google Services
-        run: |
-          echo "📱 Decoding google-services.json..."
-          mkdir -p app
-          echo "${{ secrets.GOOGLE_SERVICES_BASE64 }}" | base64 --decode > app/google-services.json
-          ls -la app/google-services.json
+          for module in "${modules[@]}"; do
+            if [ -d "$module" ] || [ "$module" == "TMessagesProj_App" ]; then
+              mkdir -p "$module"
+              cp /tmp/google-services.json "$module/google-services.json"
+              echo "✅ Добавлено в $module/"
+            fi
+          done
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+          rm /tmp/google-services.json
 
-      - name: Build APK
+      - name: Build unsigned APK
         run: ./gradlew assembleRelease
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # Очистка чувствительных файлов
-      - name: Cleanup sensitive files
-        if: always()
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > keystore.jks
+
+      - name: Sign APK
         run: |
-          rm -f $HOME/keystore
-          rm -f app/google-services.json
-          echo "🧹 Cleanup completed"
+          # Находим все неподписанные APK
+          find . -name "*-release-unsigned.apk" -o -name "*.apk" ! -name "*-signed.apk" | while read apk; do
+            echo "Подписываем: $apk"
+            
+            # Создаем имя для подписанного файла
+            signed_apk="${apk%.apk}-signed.apk"
+            
+            # Подписываем APK
+            apksigner sign --ks keystore.jks \
+              --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+              --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+              --out "$signed_apk" "$apk"
+            
+            # Заменяем оригинал подписанной версией
+            mv "$signed_apk" "$apk"
+            
+            echo "✅ Подписан: $apk"
+          done
 
-      - name: Upload APK to artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: nekogram-apk
-          path: app/build/outputs/apk/release/*.apk
-          retention-days: 30
+          path: |
+            TMessagesProj_App/build/outputs/apk/release/*.apk
+            TMessagesProj/build/outputs/apk/release/*.apk
 
-      - name: Create Release
+      - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.ref_name }}
-          files: app/build/outputs/apk/release/*.apk
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            TMessagesProj_App/build/outputs/apk/release/*.apk
+            TMessagesProj/build/outputs/apk/release/*.apk
