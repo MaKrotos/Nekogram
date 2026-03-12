@@ -22,18 +22,20 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup specific SDK components
+      # Восстанавливаем keystore из base64
+      - name: Decode keystore
         run: |
-          sdkmanager "build-tools;36.1.0"
-          sdkmanager "ndk;27.3.13750724"
-          sdkmanager "platforms;android-36"
+          echo "🔐 Decoding keystore..."
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/keystore
+          ls -la $HOME/keystore
 
-      - name: Create keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $HOME/keystore
-
-      - name: Add Google Services
-        if: secrets.GOOGLE_SERVICES_JSON != ''
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > app/google-services.json
+      # Восстанавливаем google-services.json из base64
+      - name: Decode Google Services
+        run: |
+          echo "📱 Decoding google-services.json..."
+          mkdir -p app
+          echo "${{ secrets.GOOGLE_SERVICES_BASE64 }}" | base64 --decode > app/google-services.json
+          ls -la app/google-services.json
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -45,15 +47,27 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Upload APK
+      # Очистка чувствительных файлов
+      - name: Cleanup sensitive files
+        if: always()
+        run: |
+          rm -f $HOME/keystore
+          rm -f app/google-services.json
+          echo "🧹 Cleanup completed"
+
+      - name: Upload APK to artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nekogram-apk
           path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
+          name: Release ${{ github.ref_name }}
           files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
