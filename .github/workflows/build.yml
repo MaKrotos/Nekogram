@@ -60,13 +60,29 @@ jobs:
             exit 1
           fi
 
+      - name: Configure local.properties
+        run: |
+          # Создаем local.properties с отключением Sentry
+          cat > local.properties << EOF
+          sdk.dir=$ANDROID_HOME
+          sentry.disabled=true
+          sentry.skipUpload=true
+          sentry.autoUploadProguardMapping=false
+          sentry.uploadNativeSymbols=false
+          sentry.includeSourceContext=false
+          EOF
+          echo "✅ local.properties создан с настройками:"
+          cat local.properties
+
       - name: Build APK
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          # Дополнительная страховка через переменные окружения
           SENTRY_DISABLE_AUTO_UPLOAD: true
+          SENTRY_SKIP_UPLOAD: true
 
       - name: Prepare APK for release
         run: |
@@ -78,12 +94,15 @@ jobs:
 
           echo "✅ APK готов: release/NekiGram.apk"
 
+          # Показываем размер файла
+          ls -lh release/
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NekiGram
           path: release/NekiGram.apk
-          retention-days: 30 # Хранить 30 дней
+          retention-days: 30
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -101,6 +120,10 @@ jobs:
 
             ### 🔒 Проверка подписи:
             APK подписан релизным ключом
+
+            ### 📊 Информация:
+            - Размер: $(du -h release/NekiGram.apk | cut -f1)
+            - Дата сборки: $(date +'%d.%m.%Y %H:%M')
 
           draft: false
           prerelease: false
