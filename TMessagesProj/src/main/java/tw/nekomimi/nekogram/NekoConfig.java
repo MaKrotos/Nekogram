@@ -95,6 +95,8 @@ public class NekoConfig {
     public static String openaiApiKey = "";
     public static String OpenAIBasicPropmpt = "";
 
+    public static volatile String geminiApiKey = "";
+
     public static boolean showAddToSavedMessages = true;
     public static boolean showSetReminder = false;
     public static boolean showReport = false;

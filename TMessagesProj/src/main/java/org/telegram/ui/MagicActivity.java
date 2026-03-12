@@ -23,8 +23,13 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
-import org.telegram.messenger.openAI.OpenAIService;
+import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.openAI.AIServiceFactory;
+import org.telegram.messenger.openAI.AISettings;
+import org.telegram.messenger.openAI.AISettingsActivity;
+import org.telegram.messenger.openAI.BaseAIService;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
@@ -36,19 +41,26 @@ public class MagicActivity extends BaseFragment {
 
     private ArrayList<MessageObject> selectedMessages;
     private String promptText;
-    private OpenAIService openAIService;
+    private BaseAIService aiService;
+    private AISettings aiSettings;
     private LinearLayout suggestionsContainer;
     private TextView loadingTextView;
     private TextView errorTextView;
     private View noApiKeyView;
     private RadialProgressView progressView;
     private FrameLayout progressContainer;
+    private TextView serviceInfoView;
 
     public MagicActivity() {
         super();
         selectedMessages = new ArrayList<>();
         promptText = "";
-        openAIService = new OpenAIService();
+        aiSettings = new AISettings();
+        updateService();
+    }
+
+    private void updateService() {
+        aiService = AIServiceFactory.createService(currentAccount);
     }
 
     public void setSelectedMessages(ArrayList<MessageObject> messages) {
@@ -64,11 +76,17 @@ public class MagicActivity extends BaseFragment {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(LocaleController.getString("Magic", R.string.Magic));
+
+        // Добавляем иконку настроек в экшн бар
+        actionBar.createMenu().addItem(100, R.drawable.filled_profile_settings);
+
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
+                } else if (id == 100) {
+                    openAISettings();
                 }
             }
         });
@@ -90,16 +108,27 @@ public class MagicActivity extends BaseFragment {
                 FrameLayout.LayoutParams.WRAP_CONTENT
         ));
 
-        // Заголовок с анимацией градиента
+        // Заголовок с анимацией
         TextView titleView = new TextView(context);
         titleView.setText("✨ Магия AI ✨");
         titleView.setTextSize(24);
         titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         titleView.setGravity(Gravity.CENTER);
-        titleView.setPadding(0, 0, 0, AndroidUtilities.dp(10));
+        titleView.setPadding(0, 0, 0, AndroidUtilities.dp(5));
         titleView.setAlpha(0f);
         titleView.setTranslationY(-AndroidUtilities.dp(20));
         contentLayout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+
+        // Информация о выбранном сервисе
+        serviceInfoView = new TextView(context);
+        updateServiceInfo();
+        serviceInfoView.setTextSize(13);
+        serviceInfoView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        serviceInfoView.setGravity(Gravity.CENTER);
+        serviceInfoView.setPadding(0, 0, 0, AndroidUtilities.dp(10));
+        serviceInfoView.setAlpha(0f);
+        serviceInfoView.setTranslationY(-AndroidUtilities.dp(20));
+        contentLayout.addView(serviceInfoView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
 
         // Информация о количестве выбранных сообщений
         TextView countView = new TextView(context);
@@ -190,7 +219,8 @@ public class MagicActivity extends BaseFragment {
         contentLayout.addView(suggestionsContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         // Запускаем анимацию появления
-        animateViewsIn(titleView, countView, promptText != null && !promptText.isEmpty() ? ((FrameLayout) contentLayout.getChildAt(3)) : null);
+        animateViewsIn(titleView, serviceInfoView, countView,
+                promptText != null && !promptText.isEmpty() ? ((FrameLayout) contentLayout.getChildAt(4)) : null);
 
         // Запускаем генерацию при создании представления
         if (!selectedMessages.isEmpty()) {
@@ -200,12 +230,35 @@ public class MagicActivity extends BaseFragment {
         return fragmentView;
     }
 
-    private void animateViewsIn(View titleView, View countView, View promptContainer) {
+    private void updateServiceInfo() {
+        if (serviceInfoView != null) {
+            String serviceName = aiSettings.getServiceName();
+            String modelName = "Unknown";
+
+            BaseAIService.AIModel model = aiService.getModelById(aiSettings.getCurrentModel());
+            if (model != null) {
+                modelName = model.displayName;
+            }
+
+            serviceInfoView.setText("⚡ " + serviceName + " • " + modelName);
+        }
+    }
+
+    private void animateViewsIn(View titleView, View serviceInfo, View countView, View promptContainer) {
         // Анимация заголовка
         titleView.animate()
                 .alpha(1f)
                 .translationY(0)
                 .setDuration(300)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+
+        // Анимация информации о сервисе
+        serviceInfo.animate()
+                .alpha(1f)
+                .translationY(0)
+                .setDuration(300)
+                .setStartDelay(50)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
 
@@ -251,7 +304,7 @@ public class MagicActivity extends BaseFragment {
         ));
         layout.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(20),
                 AndroidUtilities.dp(20), AndroidUtilities.dp(20));
-        layout.setVisibility(openAIService.hasApiKey() ? View.GONE : View.VISIBLE);
+        layout.setVisibility(aiSettings.hasValidConfig() ? View.GONE : View.VISIBLE);
 
         // Иконка с анимацией пульсации
         FrameLayout iconContainer = new FrameLayout(context);
@@ -328,16 +381,20 @@ public class MagicActivity extends BaseFragment {
                             .start())
                     .start();
 
-            // Закрываем текущий фрагмент и открываем настройки
-            finishFragment();
-            Toast.makeText(context, LocaleController.getString("OpenSettingsToast", R.string.OpenSettingsToast), Toast.LENGTH_LONG).show();
+            // Открываем настройки AI
+            openAISettings();
         });
 
         return layout;
     }
 
+    private void openAISettings() {
+        AISettingsActivity settingsActivity = new AISettingsActivity();
+        presentFragment(settingsActivity);
+    }
+
     private void checkAndGenerateSuggestions() {
-        if (!openAIService.hasApiKey()) {
+        if (!aiSettings.hasValidConfig()) {
             // Показываем сообщение об отсутствии ключа с анимацией
             noApiKeyView.setVisibility(View.VISIBLE);
             noApiKeyView.animate()
@@ -383,7 +440,7 @@ public class MagicActivity extends BaseFragment {
         });
         progressAnim.start();
 
-        openAIService.generateSuggestions(selectedMessages, promptText, new OpenAIService.Callback() {
+        aiService.generateSuggestions(selectedMessages, promptText, new BaseAIService.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
                 AndroidUtilities.runOnUIThread(() -> {
@@ -530,6 +587,16 @@ public class MagicActivity extends BaseFragment {
                 typeEmoji = "➡️";
                 typeText = LocaleController.getString("Continuation", R.string.Continuation);
                 typeColor = Theme.getColor(Theme.key_chat_messageLinkIn);
+                break;
+            case "humor":
+                typeEmoji = "😄";
+                typeText = LocaleController.getString("Humor", R.string.Humor);
+                typeColor = 0xFFFF9800;
+                break;
+            case "emoji":
+                typeEmoji = "😊";
+                typeText = LocaleController.getString("Emoji", R.string.Emoji);
+                typeColor = 0xFF9C27B0;
                 break;
             default:
                 typeEmoji = "💬";
@@ -700,6 +767,18 @@ public class MagicActivity extends BaseFragment {
                 .setDuration(300)
                 .setInterpolator(new OvershootInterpolator())
                 .start();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Обновляем сервис при возвращении из настроек
+        updateService();
+        updateServiceInfo();
+        // Перепроверяем наличие ключа
+        if (!selectedMessages.isEmpty()) {
+            checkAndGenerateSuggestions();
+        }
     }
 
     public String getPromptText() {
