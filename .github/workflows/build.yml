@@ -1,4 +1,4 @@
-name: Build Nekogram
+name: Build MaKrotaGram
 
 on:
   push:
