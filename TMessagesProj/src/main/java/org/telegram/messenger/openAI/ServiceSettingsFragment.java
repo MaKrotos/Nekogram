@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -27,6 +28,7 @@ import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 
+import java.io.Console;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,22 @@ public class ServiceSettingsFragment extends BaseFragment {
     private List<SettingDefinition> definitions;
     private int[] definitionRows; // mapping from definition index to row number
 
+    private static float parseFloatWithComma(String str) throws NumberFormatException {
+        return Float.parseFloat(str.replace(',', '.'));
+    }
+
+    private static int parseIntWithComma(String str) throws NumberFormatException {
+        // Удаляем все нецифровые символы, кроме минуса в начале
+        String cleaned = str.replace(',', '.');
+        // Парсим как float, затем в int (для случаев, когда введено "1,0")
+        try {
+            return Integer.parseInt(cleaned);
+        } catch (NumberFormatException e) {
+            // Если содержит точку или запятую, парсим как float и округляем
+            float f = Float.parseFloat(cleaned);
+            return Math.round(f);
+        }
+    }
     public ServiceSettingsFragment() {
         super();
     }
@@ -228,7 +246,7 @@ public class ServiceSettingsFragment extends BaseFragment {
             String str = editText.getText().toString();
             try {
                 if (isInteger) {
-                    int val = Integer.parseInt(str);
+                    int val = parseIntWithComma(str);
                     // Apply constraints
                     Map<String, Object> constraints = definition.getConstraints();
                     if (constraints != null) {
@@ -243,7 +261,7 @@ public class ServiceSettingsFragment extends BaseFragment {
                     }
                     serviceSettings.setValue(definition.getKey(), val);
                 } else {
-                    float val = Float.parseFloat(str);
+                    float val = parseFloatWithComma(str);
                     Map<String, Object> constraints = definition.getConstraints();
                     if (constraints != null) {
                         if (constraints.containsKey("min")) {
@@ -259,7 +277,7 @@ public class ServiceSettingsFragment extends BaseFragment {
                 }
                 listAdapter.notifyDataSetChanged();
             } catch (NumberFormatException e) {
-                // ignore
+                Log.e("TAG", "Ошибка парсинга числа: " + e.getMessage());
             }
         });
         builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
@@ -355,9 +373,9 @@ public class ServiceSettingsFragment extends BaseFragment {
                 try {
                     float value;
                     if (isInteger) {
-                        value = Integer.parseInt(s.toString());
+                        value = parseIntWithComma(s.toString());
                     } else {
-                        value = Float.parseFloat(s.toString());
+                        value = parseFloatWithComma(s.toString());
                     }
                     // Ограничиваем
                     if (value < min) value = min;
@@ -367,7 +385,7 @@ public class ServiceSettingsFragment extends BaseFragment {
                     seekBar.setProgress(progress);
                     valueText.setText(isInteger ? String.valueOf((int) value) : String.format("%.2f", value));
                 } catch (NumberFormatException e) {
-                    // ignore
+                    Log.e("TAG", "Ошибка парсинга числа: " + e.getMessage());
                 }
             }
         });
@@ -381,18 +399,18 @@ public class ServiceSettingsFragment extends BaseFragment {
             String str = editText.getText().toString();
             try {
                 if (isInteger) {
-                    int val = Integer.parseInt(str);
+                    int val = parseIntWithComma(str);
                     // Применяем ограничения
                     val = (int) Math.max(min, Math.min(max, val));
                     serviceSettings.setValue(definition.getKey(), val);
                 } else {
-                    float val = Float.parseFloat(str);
+                    float val = parseFloatWithComma(str);
                     val = Math.max(min, Math.min(max, val));
                     serviceSettings.setValue(definition.getKey(), val);
                 }
                 listAdapter.notifyDataSetChanged();
             } catch (NumberFormatException e) {
-                // ignore
+                Log.e("TAG", "Ошибка парсинга числа: " + e.getMessage());
             }
         });
         builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);

@@ -9,16 +9,18 @@ public class SettingDefinition {
     private final String title;
     private final String description;
     private final boolean masked;
+    private final boolean required;
     private final Object defaultValue;
     private final Map<String, Object> constraints; // например, min, max, choices
 
     public SettingDefinition(String key, SettingType type, String title, String description,
-                             boolean masked, Object defaultValue, Map<String, Object> constraints) {
+                             boolean masked, boolean required, Object defaultValue, Map<String, Object> constraints) {
         this.key = key;
         this.type = type;
         this.title = title;
         this.description = description;
         this.masked = masked;
+        this.required = required;
         this.defaultValue = defaultValue;
         this.constraints = constraints;
     }
@@ -41,6 +43,10 @@ public class SettingDefinition {
 
     public boolean isMasked() {
         return masked;
+    }
+
+    public boolean isRequired() {
+        return required;
     }
 
     public Object getDefaultValue() {
@@ -102,6 +108,7 @@ public class SettingDefinition {
         private String title;
         private String description;
         private boolean masked = false;
+        private boolean required = true; // по умолчанию обязательно
         private Object defaultValue;
         private Map<String, Object> constraints;
 
@@ -130,6 +137,11 @@ public class SettingDefinition {
             return this;
         }
 
+        public Builder setRequired(boolean required) {
+            this.required = required;
+            return this;
+        }
+
         public Builder setDefaultValue(Object defaultValue) {
             this.defaultValue = defaultValue;
             return this;
@@ -141,7 +153,7 @@ public class SettingDefinition {
         }
 
         public SettingDefinition build() {
-            return new SettingDefinition(key, type, title, description, masked, defaultValue, constraints);
+            return new SettingDefinition(key, type, title, description, masked, required, defaultValue, constraints);
         }
     }
 }

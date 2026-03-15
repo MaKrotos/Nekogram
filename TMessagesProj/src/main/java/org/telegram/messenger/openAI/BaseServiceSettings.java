@@ -7,41 +7,84 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.UserConfig;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Base class for service-specific settings.
- * Each AI service should extend this class and define its own fields.
+ * Each AI service should extend this class and define its own setting definitions.
+ * This class provides automatic loading/saving based on definitions.
  */
 public abstract class BaseServiceSettings {
+
+    // Common setting keys
+    protected static final String KEY_API_KEY = "api_key";
+    protected static final String KEY_MODEL = "model";
 
     protected int account;
     protected SharedPreferences preferences;
     protected String preferencePrefix;
+    protected Map<String, Object> currentValues = new HashMap<>();
 
     public BaseServiceSettings(int account) {
         this.account = account;
         this.preferences = ApplicationLoader.applicationContext.getSharedPreferences(
                 getSharedPreferencesName(), Context.MODE_PRIVATE);
         this.preferencePrefix = getPreferencePrefix();
+        load();
     }
 
     /**
-     * Load settings from SharedPreferences into this object's fields.
+     * Load settings from SharedPreferences into currentValues.
+     * Subclasses can override to add custom logic, but should call super.load().
      */
-    public abstract void load();
+    public void load() {
+        currentValues.clear();
+        for (SettingDefinition def : getSettingDefinitions()) {
+            Object value = loadValue(def);
+            currentValues.put(def.getKey(), value);
+        }
+        onLoad();
+    }
 
     /**
-     * Save current fields to SharedPreferences.
+     * Save currentValues to SharedPreferences.
+     * Subclasses can override to add custom logic, but should call super.save().
      */
-    public abstract void save();
+    public void save() {
+        SharedPreferences.Editor editor = preferences.edit();
+        for (SettingDefinition def : getSettingDefinitions()) {
+            Object value = currentValues.get(def.getKey());
+            if (value == null) {
+                value = def.getDefaultValue();
+            }
+            saveValue(def, value, editor);
+        }
+        try {
+            editor.apply();
+            FileLog.d("BaseServiceSettings: Saved all preferences for " + getServiceType());
+        } catch (Exception e) {
+            FileLog.e("BaseServiceSettings: Failed to save preferences", e);
+        }
+        onSave();
+    }
 
     /**
-     * Validate the settings (e.g., API key not empty).
-     * @return true if settings are valid for making requests.
+     * Validate the settings based on required definitions.
+     * @return true if all required settings have non-empty values.
      */
-    public abstract boolean validate();
+    public boolean validate() {
+        for (SettingDefinition def : getSettingDefinitions()) {
+            if (def.isRequired()) {
+                Object value = getValue(def.getKey());
+                if (value == null || (value instanceof String && TextUtils.isEmpty((String) value))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     /**
      * Get the service type this settings belong to.
@@ -52,26 +95,6 @@ public abstract class BaseServiceSettings {
      * Get the default model ID for this service.
      */
     public abstract String getDefaultModelId();
-
-    /**
-     * Get the API key for this service.
-     */
-    public abstract String getApiKey();
-
-    /**
-     * Set the API key for this service.
-     */
-    public abstract void setApiKey(String apiKey);
-
-    /**
-     * Get the model ID for this service.
-     */
-    public abstract String getModel();
-
-    /**
-     * Set the model ID for this service.
-     */
-    public abstract void setModel(String model);
 
     /**
      * Get the display name of the service.
@@ -90,24 +113,17 @@ public abstract class BaseServiceSettings {
      * @return the value as Object (String, Integer, Float, Boolean) or null if not found.
      */
     public Object getValue(String key) {
+        if (currentValues.containsKey(key)) {
+            return currentValues.get(key);
+        }
+        // fallback to loading from preferences
         SettingDefinition def = findDefinition(key);
         if (def == null) {
             return null;
         }
-        switch (def.getType()) {
-            case STRING:
-                return getString(key, def.getStringDefault());
-            case INT:
-                return getInt(key, def.getIntDefault());
-            case FLOAT:
-                return getFloat(key, def.getFloatDefault());
-            case BOOLEAN:
-                return getBoolean(key, def.getBooleanDefault());
-            case CHOICE:
-                return getString(key, def.getStringDefault());
-            default:
-                return null;
-        }
+        Object value = loadValue(def);
+        currentValues.put(key, value);
+        return value;
     }
 
     /**
@@ -120,42 +136,42 @@ public abstract class BaseServiceSettings {
         if (def == null) {
             return;
         }
-        switch (def.getType()) {
-            case STRING:
-            case CHOICE:
-                if (value instanceof String) {
-                    putString(key, (String) value);
-                }
-                break;
-            case INT:
-                if (value instanceof Integer) {
-                    putInt(key, (Integer) value);
-                } else if (value instanceof Number) {
-                    putInt(key, ((Number) value).intValue());
-                }
-                break;
-            case FLOAT:
-                if (value instanceof Float) {
-                    putFloat(key, (Float) value);
-                } else if (value instanceof Number) {
-                    putFloat(key, ((Number) value).floatValue());
-                }
-                break;
-            case BOOLEAN:
-                if (value instanceof Boolean) {
-                    putBoolean(key, (Boolean) value);
-                }
-                break;
+        // Validate type
+        if (!isTypeMatch(def.getType(), value)) {
+            FileLog.e("BaseServiceSettings: Type mismatch for key " + key);
+            return;
         }
+        currentValues.put(key, value);
+        // Immediately persist
+        saveValue(def, value, preferences.edit());
     }
 
-    private SettingDefinition findDefinition(String key) {
-        for (SettingDefinition def : getSettingDefinitions()) {
-            if (def.getKey().equals(key)) {
-                return def;
-            }
-        }
-        return null;
+    /**
+     * Get the API key for this service.
+     */
+    public String getApiKey() {
+        return (String) getValue(KEY_API_KEY);
+    }
+
+    /**
+     * Set the API key for this service.
+     */
+    public void setApiKey(String apiKey) {
+        setValue(KEY_API_KEY, apiKey);
+    }
+
+    /**
+     * Get the model ID for this service.
+     */
+    public String getModel() {
+        return (String) getValue(KEY_MODEL);
+    }
+
+    /**
+     * Set the model ID for this service.
+     */
+    public void setModel(String model) {
+        setValue(KEY_MODEL, model);
     }
 
     // Helper methods
@@ -172,80 +188,84 @@ public abstract class BaseServiceSettings {
         return preferencePrefix + suffix;
     }
 
-    protected void putString(String key, String value) {
+    private SettingDefinition findDefinition(String key) {
+        for (SettingDefinition def : getSettingDefinitions()) {
+            if (def.getKey().equals(key)) {
+                return def;
+            }
+        }
+        return null;
+    }
+
+    private Object loadValue(SettingDefinition def) {
+        String fullKey = getKey(def.getKey());
+        switch (def.getType()) {
+            case STRING:
+            case CHOICE:
+                return preferences.getString(fullKey, def.getStringDefault());
+            case INT:
+                return preferences.getInt(fullKey, def.getIntDefault());
+            case FLOAT:
+                return preferences.getFloat(fullKey, def.getFloatDefault());
+            case BOOLEAN:
+                return preferences.getBoolean(fullKey, def.getBooleanDefault());
+            default:
+                return null;
+        }
+    }
+
+    private void saveValue(SettingDefinition def, Object value, SharedPreferences.Editor editor) {
+        String fullKey = getKey(def.getKey());
         try {
-            preferences.edit().putString(getKey(key), value).apply();
-            FileLog.d("BaseServiceSettings: Saved string preference: " + key + " = " + (key.toLowerCase().contains("key") ? "***" : value));
+            switch (def.getType()) {
+                case STRING:
+                case CHOICE:
+                    editor.putString(fullKey, (String) value);
+                    break;
+                case INT:
+                    editor.putInt(fullKey, (Integer) value);
+                    break;
+                case FLOAT:
+                    editor.putFloat(fullKey, (Float) value);
+                    break;
+                case BOOLEAN:
+                    editor.putBoolean(fullKey, (Boolean) value);
+                    break;
+            }
         } catch (Exception e) {
-            FileLog.e("BaseServiceSettings: Failed to save string preference: " + key, e);
+            FileLog.e("BaseServiceSettings: Failed to save value for key " + def.getKey(), e);
         }
     }
 
-    protected String getString(String key, String defaultValue) {
-        try {
-            return preferences.getString(getKey(key), defaultValue);
-        } catch (ClassCastException e) {
-            FileLog.e("BaseServiceSettings: Invalid type for string preference: " + key, e);
-            return defaultValue;
+    private boolean isTypeMatch(SettingType type, Object value) {
+        if (value == null) return false;
+        switch (type) {
+            case STRING:
+            case CHOICE:
+                return value instanceof String;
+            case INT:
+                return value instanceof Integer;
+            case FLOAT:
+                return value instanceof Float;
+            case BOOLEAN:
+                return value instanceof Boolean;
+            default:
+                return false;
         }
     }
 
-    protected void putInt(String key, int value) {
-        try {
-            preferences.edit().putInt(getKey(key), value).apply();
-            FileLog.d("BaseServiceSettings: Saved int preference: " + key + " = " + value);
-        } catch (Exception e) {
-            FileLog.e("BaseServiceSettings: Failed to save int preference: " + key, e);
-        }
+    /**
+     * Called after loading values. Subclasses can override to perform additional initialization.
+     */
+    protected void onLoad() {
+        // optional override
     }
 
-    protected int getInt(String key, int defaultValue) {
-        try {
-            int value = preferences.getInt(getKey(key), defaultValue);
-            FileLog.d("BaseServiceSettings: Loaded int preference: " + key + " = " + value + " (fullKey=" + getKey(key) + ")");
-            return value;
-        } catch (ClassCastException e) {
-            FileLog.e("BaseServiceSettings: Invalid type for int preference: " + key, e);
-            return defaultValue;
-        }
-    }
-
-    protected void putFloat(String key, float value) {
-        try {
-            preferences.edit().putFloat(getKey(key), value).apply();
-            FileLog.d("BaseServiceSettings: Saved float preference: " + key + " = " + value);
-        } catch (Exception e) {
-            FileLog.e("BaseServiceSettings: Failed to save float preference: " + key, e);
-        }
-    }
-
-    protected float getFloat(String key, float defaultValue) {
-        try {
-            float value = preferences.getFloat(getKey(key), defaultValue);
-            FileLog.d("BaseServiceSettings: Loaded float preference: " + key + " = " + value + " (fullKey=" + getKey(key) + ")");
-            return value;
-        } catch (ClassCastException e) {
-            FileLog.e("BaseServiceSettings: Invalid type for float preference: " + key, e);
-            return defaultValue;
-        }
-    }
-
-    protected void putBoolean(String key, boolean value) {
-        try {
-            preferences.edit().putBoolean(getKey(key), value).apply();
-            FileLog.d("BaseServiceSettings: Saved boolean preference: " + key + " = " + value);
-        } catch (Exception e) {
-            FileLog.e("BaseServiceSettings: Failed to save boolean preference: " + key, e);
-        }
-    }
-
-    protected boolean getBoolean(String key, boolean defaultValue) {
-        try {
-            return preferences.getBoolean(getKey(key), defaultValue);
-        } catch (ClassCastException e) {
-            FileLog.e("BaseServiceSettings: Invalid type for boolean preference: " + key, e);
-            return defaultValue;
-        }
+    /**
+     * Called before saving values. Subclasses can override to perform additional actions.
+     */
+    protected void onSave() {
+        // optional override
     }
 
     /**
@@ -260,6 +280,7 @@ public abstract class BaseServiceSettings {
         }
         try {
             editor.apply();
+            currentValues.clear();
         } catch (Exception e) {
             FileLog.e("BaseServiceSettings: Failed to clear preferences", e);
         }

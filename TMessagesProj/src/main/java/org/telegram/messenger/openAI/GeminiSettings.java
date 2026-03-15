@@ -2,12 +2,13 @@ package org.telegram.messenger.openAI;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import android.text.TextUtils;
+import org.telegram.messenger.FileLog;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Map;
-import android.text.TextUtils;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Settings specific to Google Gemini service.
@@ -15,8 +16,6 @@ import java.util.List;
 public class GeminiSettings extends BaseServiceSettings {
 
     // Field keys
-    private static final String KEY_API_KEY = "api_key";
-    private static final String KEY_MODEL = "model";
     private static final String KEY_TEMPERATURE = "temperature";
     private static final String KEY_MAX_OUTPUT_TOKENS = "max_output_tokens";
     private static final String KEY_TOP_P = "top_p";
@@ -31,87 +30,8 @@ public class GeminiSettings extends BaseServiceSettings {
     public static final int DEFAULT_TOP_K = 40;
     public static final String DEFAULT_SAFETY_SETTING = "BLOCK_NONE";
 
-    // Fields
-    private String apiKey = "";
-    private String model = DEFAULT_MODEL;
-    private float temperature = DEFAULT_TEMPERATURE;
-    private int maxOutputTokens = DEFAULT_MAX_OUTPUT_TOKENS;
-    private float topP = DEFAULT_TOP_P;
-    private int topK = DEFAULT_TOP_K;
-    private Map<String, String> safetySettings = new HashMap<>();
-
     public GeminiSettings(int account) {
         super(account);
-        load();
-    }
-
-    @Override
-    public void load() {
-        apiKey = getString(KEY_API_KEY, "");
-        model = getString(KEY_MODEL, DEFAULT_MODEL);
-        temperature = getFloat(KEY_TEMPERATURE, DEFAULT_TEMPERATURE);
-        maxOutputTokens = getInt(KEY_MAX_OUTPUT_TOKENS, DEFAULT_MAX_OUTPUT_TOKENS);
-        topP = getFloat(KEY_TOP_P, DEFAULT_TOP_P);
-        topK = getInt(KEY_TOP_K, DEFAULT_TOP_K);
-        loadSafetySettings();
-    }
-
-    private void loadSafetySettings() {
-        safetySettings.clear();
-        String json = getString(KEY_SAFETY_SETTINGS, "");
-        if (!TextUtils.isEmpty(json)) {
-            try {
-                JSONArray array = new JSONArray(json);
-                for (int i = 0; i < array.length(); i++) {
-                    JSONObject obj = array.getJSONObject(i);
-                    String category = obj.optString("category");
-                    String threshold = obj.optString("threshold");
-                    if (category != null && threshold != null) {
-                        safetySettings.put(category, threshold);
-                    }
-                }
-            } catch (Exception e) {
-                // ignore
-            }
-        }
-        // If empty, set defaults
-        if (safetySettings.isEmpty()) {
-            safetySettings.put("HARM_CATEGORY_HARASSMENT", DEFAULT_SAFETY_SETTING);
-            safetySettings.put("HARM_CATEGORY_HATE_SPEECH", DEFAULT_SAFETY_SETTING);
-            safetySettings.put("HARM_CATEGORY_SEXUALLY_EXPLICIT", DEFAULT_SAFETY_SETTING);
-            safetySettings.put("HARM_CATEGORY_DANGEROUS_CONTENT", DEFAULT_SAFETY_SETTING);
-        }
-    }
-
-    @Override
-    public void save() {
-        putString(KEY_API_KEY, apiKey);
-        putString(KEY_MODEL, model);
-        putFloat(KEY_TEMPERATURE, temperature);
-        putInt(KEY_MAX_OUTPUT_TOKENS, maxOutputTokens);
-        putFloat(KEY_TOP_P, topP);
-        putInt(KEY_TOP_K, topK);
-        saveSafetySettings();
-    }
-
-    private void saveSafetySettings() {
-        try {
-            JSONArray array = new JSONArray();
-            for (Map.Entry<String, String> entry : safetySettings.entrySet()) {
-                JSONObject obj = new JSONObject();
-                obj.put("category", entry.getKey());
-                obj.put("threshold", entry.getValue());
-                array.put(obj);
-            }
-            putString(KEY_SAFETY_SETTINGS, array.toString());
-        } catch (Exception e) {
-            // ignore
-        }
-    }
-
-    @Override
-    public boolean validate() {
-        return !TextUtils.isEmpty(apiKey);
     }
 
     @Override
@@ -125,121 +45,109 @@ public class GeminiSettings extends BaseServiceSettings {
     }
 
     @Override
-    public String getApiKey() {
-        return apiKey;
-    }
-
-    @Override
-    public void setApiKey(String apiKey) {
-        this.apiKey = apiKey != null ? apiKey : "";
-    }
-
-    @Override
-    public String getModel() {
-        return model;
-    }
-
-    @Override
-    public void setModel(String model) {
-        this.model = model != null ? model : DEFAULT_MODEL;
-    }
-
-    public float getTemperature() {
-        return temperature;
-    }
-
-    public void setTemperature(float temperature) {
-        this.temperature = temperature;
-    }
-
-    public int getMaxOutputTokens() {
-        return maxOutputTokens;
-    }
-
-    public void setMaxOutputTokens(int maxOutputTokens) {
-        this.maxOutputTokens = maxOutputTokens;
-    }
-
-    public float getTopP() {
-        return topP;
-    }
-
-    public void setTopP(float topP) {
-        this.topP = topP;
-    }
-
-    public int getTopK() {
-        return topK;
-    }
-
-    public void setTopK(int topK) {
-        this.topK = topK;
-    }
-
-    public Map<String, String> getSafetySettings() {
-        return safetySettings;
-    }
-
-    public void setSafetySettings(Map<String, String> safetySettings) {
-        this.safetySettings = safetySettings != null ? safetySettings : new HashMap<>();
-    }
-
-    public void setSafetySetting(String category, String threshold) {
-        safetySettings.put(category, threshold);
-    }
-
-    public String getSafetySetting(String category) {
-        return safetySettings.get(category);
-    }
-
-    @Override
-    public void setValue(String key, Object value) {
-        switch (key) {
-            case KEY_TEMPERATURE:
-                if (value instanceof Number) {
-                    setTemperature(((Number) value).floatValue());
-                }
-                break;
-            case KEY_MAX_OUTPUT_TOKENS:
-                if (value instanceof Number) {
-                    setMaxOutputTokens(((Number) value).intValue());
-                }
-                break;
-            case KEY_TOP_P:
-                if (value instanceof Number) {
-                    setTopP(((Number) value).floatValue());
-                }
-                break;
-            case KEY_TOP_K:
-                if (value instanceof Number) {
-                    setTopK(((Number) value).intValue());
-                }
-                break;
-            case KEY_API_KEY:
-                if (value instanceof String) {
-                    setApiKey((String) value);
-                }
-                break;
-            case KEY_MODEL:
-                if (value instanceof String) {
-                    setModel((String) value);
-                }
-                break;
-            case KEY_SAFETY_SETTINGS:
-                if (value instanceof String) {
-                    // Обработка JSON строки безопасности
-                    // Пока просто сохраняем строку, но нужно также обновить safetySettings
-                    // Для простоты игнорируем, так как это сложный объект
-                }
-                break;
-        }
-        super.setValue(key, value);
-    }
-
-    @Override
     public String getServiceDisplayName() {
         return "Google Gemini";
     }
+
+    @Override
+    protected void onLoad() {
+        // Можно добавить логирование
+        FileLog.d("GeminiSettings loaded: temperature=" + getTemperature() +
+                ", maxOutputTokens=" + getMaxOutputTokens() +
+                ", topP=" + getTopP() +
+                ", topK=" + getTopK());
+    }
+
+    // Convenience getters that use getValue
+    public float getTemperature() {
+        return (float) getValue(KEY_TEMPERATURE);
+    }
+
+    public void setTemperature(float temperature) {
+        setValue(KEY_TEMPERATURE, temperature);
+    }
+
+    public int getMaxOutputTokens() {
+        return (int) getValue(KEY_MAX_OUTPUT_TOKENS);
+    }
+
+    public void setMaxOutputTokens(int maxOutputTokens) {
+        setValue(KEY_MAX_OUTPUT_TOKENS, maxOutputTokens);
+    }
+
+    public float getTopP() {
+        return (float) getValue(KEY_TOP_P);
+    }
+
+    public void setTopP(float topP) {
+        setValue(KEY_TOP_P, topP);
+    }
+
+    public int getTopK() {
+        return (int) getValue(KEY_TOP_K);
+    }
+
+    public void setTopK(int topK) {
+        setValue(KEY_TOP_K, topK);
+    }
+
+    // Safety settings as JSON string
+    public Map<String, String> getSafetySettings() {
+        String json = (String) getValue(KEY_SAFETY_SETTINGS);
+        Map<String, String> map = new HashMap<>();
+        if (TextUtils.isEmpty(json)) {
+            // Defaults
+            map.put("HARM_CATEGORY_HARASSMENT", DEFAULT_SAFETY_SETTING);
+            map.put("HARM_CATEGORY_HATE_SPEECH", DEFAULT_SAFETY_SETTING);
+            map.put("HARM_CATEGORY_SEXUALLY_EXPLICIT", DEFAULT_SAFETY_SETTING);
+            map.put("HARM_CATEGORY_DANGEROUS_CONTENT", DEFAULT_SAFETY_SETTING);
+            return map;
+        }
+        try {
+            JSONArray array = new JSONArray(json);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                String category = obj.optString("category");
+                String threshold = obj.optString("threshold");
+                if (category != null && threshold != null) {
+                    map.put(category, threshold);
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return map;
+    }
+
+    public void setSafetySettings(Map<String, String> safetySettings) {
+        if (safetySettings == null || safetySettings.isEmpty()) {
+            setValue(KEY_SAFETY_SETTINGS, "");
+            return;
+        }
+        try {
+            JSONArray array = new JSONArray();
+            for (Map.Entry<String, String> entry : safetySettings.entrySet()) {
+                JSONObject obj = new JSONObject();
+                obj.put("category", entry.getKey());
+                obj.put("threshold", entry.getValue());
+                array.put(obj);
+            }
+            setValue(KEY_SAFETY_SETTINGS, array.toString());
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
+    public void setSafetySetting(String category, String threshold) {
+        Map<String, String> map = getSafetySettings();
+        map.put(category, threshold);
+        setSafetySettings(map);
+    }
+
+    public String getSafetySetting(String category) {
+        return getSafetySettings().get(category);
+    }
+
     @Override
     public List<SettingDefinition> getSettingDefinitions() {
         List<SettingDefinition> definitions = new ArrayList<>();
@@ -249,6 +157,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("API Key")
                 .setDescription("Ключ API от Google AI Studio. Начинается с 'AIza'.")
                 .setMasked(true)
+                .setRequired(false) // не обязательный
                 .setDefaultValue("")
                 .build());
         definitions.add(new SettingDefinition.Builder()
@@ -257,6 +166,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Модель")
                 .setDescription("Модель Gemini для генерации текста.")
                 .setMasked(false)
+                .setRequired(true)
                 .setDefaultValue(DEFAULT_MODEL)
                 .setConstraints(new HashMap<String, Object>() {{
                     put("choices", Arrays.asList(
@@ -274,6 +184,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Температура")
                 .setDescription("Контроль случайности ответов (0.0 - 1.0).")
                 .setMasked(false)
+                .setRequired(false)
                 .setDefaultValue(DEFAULT_TEMPERATURE)
                 .setConstraints(new HashMap<String, Object>() {{
                     put("min", 0.0f);
@@ -286,6 +197,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Максимальное количество токенов")
                 .setDescription("Ограничение длины ответа в токенах.")
                 .setMasked(false)
+                .setRequired(false)
                 .setDefaultValue(DEFAULT_MAX_OUTPUT_TOKENS)
                 .setConstraints(new HashMap<String, Object>() {{
                     put("min", 1);
@@ -298,6 +210,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Top P")
                 .setDescription("Альтернатива температуре, ядерная выборка (0.0 - 1.0).")
                 .setMasked(false)
+                .setRequired(false)
                 .setDefaultValue(DEFAULT_TOP_P)
                 .setConstraints(new HashMap<String, Object>() {{
                     put("min", 0.0f);
@@ -310,6 +223,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Top K")
                 .setDescription("Количество наиболее вероятных токенов для выборки (1-40).")
                 .setMasked(false)
+                .setRequired(false)
                 .setDefaultValue(DEFAULT_TOP_K)
                 .setConstraints(new HashMap<String, Object>() {{
                     put("min", 1);
@@ -323,6 +237,7 @@ public class GeminiSettings extends BaseServiceSettings {
                 .setTitle("Настройки безопасности")
                 .setDescription("JSON-массив настроек безопасности (категория и порог).")
                 .setMasked(false)
+                .setRequired(false)
                 .setDefaultValue("")
                 .build());
         return definitions;
