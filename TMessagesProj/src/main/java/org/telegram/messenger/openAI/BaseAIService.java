@@ -1,3 +1,4 @@
+
 package org.telegram.messenger.openAI;
 
 import android.text.TextUtils;
@@ -54,10 +55,11 @@ public abstract class BaseAIService {
                     "Важно: НИКОГДА не возвращай меньше 3 вариантов. Ответ должен быть только в JSON формате.";
 
     protected int currentAccount;
-    protected AISettings settings;
+    protected AISettings aiSettings;
 
     public interface Callback {
         void onSuccess(JSONObject response);
+
         void onError(String error);
     }
 
@@ -83,7 +85,7 @@ public abstract class BaseAIService {
 
     public BaseAIService(int account) {
         this.currentAccount = account;
-        this.settings = new AISettings(account);
+        this.aiSettings = new AISettings(account);
     }
 
     public BaseAIService() {
@@ -92,14 +94,45 @@ public abstract class BaseAIService {
 
     // Абстрактные методы, которые должны реализовать конкретные сервисы
     protected abstract void makeRequest(String systemPrompt, String history, String model, Callback callback);
-    public abstract boolean hasValidConfig();
+
     public abstract String getServiceName();
+
     public abstract AISettings.AIServiceType getServiceType();
 
     // Новые абстрактные методы для моделей
     public abstract AIModel[] getAvailableModels();
+
     public abstract String getDefaultModelId();
+
     public abstract AIModel getModelById(String modelId);
+
+    /**
+     * Returns the service-specific settings for this service.
+     */
+    protected BaseServiceSettings getServiceSettings() {
+        return aiSettings.getServiceSettings(getServiceType());
+    }
+
+    /**
+     * Check if this service has valid configuration (API key set).
+     */
+    public boolean hasValidConfig() {
+        return getServiceSettings().validate();
+    }
+
+    /**
+     * Get the API key for this service.
+     */
+    protected String getApiKey() {
+        return getServiceSettings().getApiKey();
+    }
+
+    /**
+     * Get the model ID for this service.
+     */
+    protected String getModel() {
+        return getServiceSettings().getModel();
+    }
 
     // Общая логика генерации запроса
     public void generateSuggestions(ArrayList<MessageObject> messages, String userPrompt, Callback callback) {
@@ -110,7 +143,7 @@ public abstract class BaseAIService {
 
         try {
             // Получаем выбранную модель из настроек
-            String modelId = settings.getCurrentModel();
+            String modelId = getModel();
             AIModel model = getModelById(modelId);
             if (model == null) {
                 model = getModelById(getDefaultModelId());
@@ -152,7 +185,7 @@ public abstract class BaseAIService {
 
         // Добавляем информацию о используемом сервисе и модели
         history.append("🤖 ИСПОЛЬЗУЕТСЯ: ").append(getServiceName()).append("\n");
-        history.append("📊 МОДЕЛЬ: ").append(getModelById(settings.getCurrentModel()).displayName).append("\n\n");
+        history.append("📊 МОДЕЛЬ: ").append(getModelById(getModel()).displayName).append("\n\n");
 
         // Добавляем пользовательский промпт если есть
         if (!TextUtils.isEmpty(userPrompt)) {
@@ -310,72 +343,44 @@ public abstract class BaseAIService {
             }
 
             while (enhanced.length() < 3) {
-                JSONObject defaultSuggestion = new JSONObject();
-                defaultSuggestion.put("text", getDefaultSuggestionText(enhanced.length()));
-                defaultSuggestion.put("confidence", 0.6);
-                defaultSuggestion.put("type", getDefaultSuggestionType(enhanced.length()));
-                enhanced.put(defaultSuggestion);
+                JSONObject fallback = createDefaultResponse();
+                enhanced.put(fallback);
             }
 
             original.put("suggestions", enhanced);
             return original;
         } catch (Exception e) {
+            FileLog.e("Error enhancing suggestions: " + e.getMessage());
             return original;
         }
     }
 
-    private String getDefaultSuggestionText(int index) {
-        switch (index) {
-            case 0: return "Интересно, расскажи подробнее";
-            case 1: return "Понятно, спасибо";
-            default: return "😊 Хорошо";
-        }
-    }
-
-    private String getDefaultSuggestionType(int index) {
-        switch (index) {
-            case 0: return "question";
-            case 1: return "answer";
-            default: return "emoji";
-        }
-    }
-
-    protected JSONObject createDefaultResponse() {
+    public JSONObject createDefaultResponse() {
+        JSONObject suggestion = new JSONObject();
         try {
-            JSONObject result = new JSONObject();
-            JSONArray suggestions = new JSONArray();
-
-            JSONObject s1 = new JSONObject();
-            s1.put("text", "Да, я согласен");
-            s1.put("confidence", 0.9);
-            s1.put("type", "answer");
-            suggestions.put(s1);
-
-            JSONObject s2 = new JSONObject();
-            s2.put("text", "А что ты думаешь?");
-            s2.put("confidence", 0.8);
-            s2.put("type", "question");
-            suggestions.put(s2);
-
-            JSONObject s3 = new JSONObject();
-            s3.put("text", "Интересно! 😊");
-            s3.put("confidence", 0.7);
-            s3.put("type", "emoji");
-            suggestions.put(s3);
-
-            result.put("suggestions", suggestions);
-            result.put("explanation", "Стандартные варианты ответа");
-            return result;
+            suggestion.put("text", "Да, я согласен");
+            suggestion.put("confidence", 0.8);
+            suggestion.put("type", "answer");
         } catch (Exception e) {
-            return new JSONObject();
+            FileLog.e("Error creating default response: " + e.getMessage());
         }
+        return suggestion;
     }
 
-    protected String cleanJsonResponse(String response) {
-        response = response.replaceAll("```json\\s*", "");
-        response = response.replaceAll("```\\s*", "");
-        response = response.replaceAll("^\\s*\\{", "{");
-        response = response.replaceAll("\\}\\s*$", "}");
-        return response.trim();
+    protected JSONObject cleanJsonResponse(String raw) {
+        // Удаляем возможные лишние символы в начале/конце
+        String cleaned = raw.trim();
+        // Ищем начало JSON
+        int start = cleaned.indexOf('{');
+        int end = cleaned.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            cleaned = cleaned.substring(start, end + 1);
+        }
+        try {
+            return new JSONObject(cleaned);
+        } catch (Exception e) {
+            FileLog.e("Error parsing JSON: " + e.getMessage());
+            return null;
+        }
     }
 }

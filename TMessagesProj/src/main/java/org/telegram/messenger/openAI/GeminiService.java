@@ -113,11 +113,13 @@ public class GeminiService extends BaseAIService {
 
     @Override
     protected void makeRequest(String systemPrompt, String history, String model, Callback callback) {
-        String apiKey = settings.getCurrentApiKey();
+        String apiKey = getApiKey();
         if (TextUtils.isEmpty(apiKey)) {
             callback.onError("API ключ Gemini не установлен");
             return;
         }
+
+        GeminiSettings geminiSettings = (GeminiSettings) getServiceSettings();
 
         try {
             // Формируем URL с учетом выбранной модели
@@ -142,20 +144,20 @@ public class GeminiService extends BaseAIService {
             contents.put(content);
             requestBody.put("contents", contents);
 
-            // Настройки генерации
+            // Настройки генерации из настроек
             JSONObject generationConfig = new JSONObject();
-            generationConfig.put("temperature", 0.9);
-            generationConfig.put("maxOutputTokens", 1500);
-            generationConfig.put("topP", 0.95);
-            generationConfig.put("topK", 40);
+            generationConfig.put("temperature", geminiSettings.getTemperature());
+            generationConfig.put("maxOutputTokens", geminiSettings.getMaxOutputTokens());
+            generationConfig.put("topP", geminiSettings.getTopP());
+            generationConfig.put("topK", geminiSettings.getTopK());
             requestBody.put("generationConfig", generationConfig);
 
-            // Настройки безопасности (помягче)
+            // Настройки безопасности из настроек
             JSONArray safetySettings = new JSONArray();
-            addSafetySetting(safetySettings, "HARM_CATEGORY_HARASSMENT", "BLOCK_NONE");
-            addSafetySetting(safetySettings, "HARM_CATEGORY_HATE_SPEECH", "BLOCK_NONE");
-            addSafetySetting(safetySettings, "HARM_CATEGORY_SEXUALLY_EXPLICIT", "BLOCK_NONE");
-            addSafetySetting(safetySettings, "HARM_CATEGORY_DANGEROUS_CONTENT", "BLOCK_NONE");
+            Map<String, String> safetyMap = geminiSettings.getSafetySettings();
+            for (Map.Entry<String, String> entry : safetyMap.entrySet()) {
+                addSafetySetting(safetySettings, entry.getKey(), entry.getValue());
+            }
             requestBody.put("safetySettings", safetySettings);
 
             Request request = new Request.Builder()
@@ -174,9 +176,11 @@ public class GeminiService extends BaseAIService {
                         String contentsd = extractContentFromGeminiResponse(jsonResponse);
 
                         try {
-                            contentsd = cleanJsonResponse(contentsd);
-                            JSONObject suggestions = new JSONObject(contentsd);
-                            suggestions = enhanceSuggestions(suggestions);
+                            JSONObject cleanedJson = cleanJsonResponse(contentsd);
+                            if (cleanedJson == null) {
+                                throw new Exception("Failed to parse JSON response");
+                            }
+                            JSONObject suggestions = enhanceSuggestions(cleanedJson);
                             callback.onSuccess(suggestions);
                         } catch (Exception e) {
                             FileLog.e("Error parsing Gemini response: " + e.getMessage());
@@ -204,10 +208,6 @@ public class GeminiService extends BaseAIService {
         settings.put(setting);
     }
 
-    @Override
-    public boolean hasValidConfig() {
-        return !TextUtils.isEmpty(settings.getCurrentApiKey());
-    }
 
     @Override
     public String getServiceName() {

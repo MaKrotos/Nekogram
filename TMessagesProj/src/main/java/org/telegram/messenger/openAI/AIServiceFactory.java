@@ -14,7 +14,7 @@ public class AIServiceFactory {
 
     public static BaseAIService createService(int account) {
         AISettings settings = new AISettings(account);
-        AISettings.AIServiceType type = settings.loadSettings().selectedService;
+        AISettings.AIServiceType type = settings.getSelectedServiceType();
         return createService(type, account);
     }
 
@@ -24,8 +24,6 @@ public class AIServiceFactory {
                 return new OpenAIService(account);
             case GEMINI:
                 return new GeminiService(account);
-            case LLAMA:
-                return new LlamaService(account);
             default:
                 return new OpenAIService(account);
         }

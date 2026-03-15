@@ -55,20 +55,22 @@ public class OpenAIService extends BaseAIService {
 
     @Override
     protected void makeRequest(String systemPrompt, String history, String model, Callback callback) {
-        String apiKey = settings.getCurrentApiKey();
+        String apiKey = getApiKey();
         if (TextUtils.isEmpty(apiKey)) {
             callback.onError("API ключ OpenAI не установлен");
             return;
         }
 
+        OpenAISettings openAISettings = (OpenAISettings) getServiceSettings();
+
         try {
             JSONObject requestBody = new JSONObject();
             requestBody.put("model", model);
-            requestBody.put("temperature", 0.9);
-            requestBody.put("max_tokens", 1500);
-            requestBody.put("top_p", 0.95);
-            requestBody.put("frequency_penalty", 0.5);
-            requestBody.put("presence_penalty", 0.6);
+            requestBody.put("temperature", openAISettings.getTemperature());
+            requestBody.put("max_tokens", openAISettings.getMaxTokens());
+            requestBody.put("top_p", openAISettings.getTopP());
+            requestBody.put("frequency_penalty", openAISettings.getFrequencyPenalty());
+            requestBody.put("presence_penalty", openAISettings.getPresencePenalty());
 
             JSONArray messages = new JSONArray();
 
@@ -104,9 +106,11 @@ public class OpenAIService extends BaseAIService {
                                     .getString("content");
 
                             try {
-                                content = cleanJsonResponse(content);
-                                JSONObject suggestions = new JSONObject(content);
-                                suggestions = enhanceSuggestions(suggestions);
+                                JSONObject cleanedJson = cleanJsonResponse(content);
+                                if (cleanedJson == null) {
+                                    throw new Exception("Failed to parse JSON response");
+                                }
+                                JSONObject suggestions = enhanceSuggestions(cleanedJson);
                                 callback.onSuccess(suggestions);
                             } catch (Exception e) {
                                 FileLog.e("Error parsing OpenAI response: " + e.getMessage());
@@ -130,10 +134,6 @@ public class OpenAIService extends BaseAIService {
         }
     }
 
-    @Override
-    public boolean hasValidConfig() {
-        return !TextUtils.isEmpty(settings.getCurrentApiKey());
-    }
 
     @Override
     public String getServiceName() {

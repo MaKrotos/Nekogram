@@ -4,8 +4,8 @@
 #define LOG_DISABLED
 #endif
 #define PACKAGE_NAME "tw.nekomimi.nekogram"_iobfs.c_str()
-#define CERT_HASH 0xff12bf00
-#define CERT_SIZE 0x2e8
+#define CERT_HASH 0x25c3baa7
+#define CERT_SIZE 0x352
 
 #ifdef __cplusplus
 extern "C" {
