@@ -59,7 +59,7 @@ public class AISettings {
     public AISettings(int account) {
         this.currentAccount = account;
         this.preferences = ApplicationLoader.applicationContext.getSharedPreferences(
-            PREFS_NAME + "_" + account, Context.MODE_PRIVATE); // настройки промпта и выбранного сервиса зависят от аккаунта
+            PREFS_NAME + "_" + account, Context.MODE_PRIVATE); /
         this.serviceSettingsMap = new HashMap<>();
         loadAll();
     }
