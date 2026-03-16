@@ -17,7 +17,7 @@ import java.util.Set;
 public abstract class BaseAIService {
 
     protected static final String SYSTEM_PROMPT =
-            "Ты - креативный помощник, который помогает пользователю мессенджера придумать, ЧТО ОТВЕТИТЬ в чате. " +
+            "Ты - креативный помощник, который помогает пользователю мессенджера придумать, ЧТО ОТВЕТИТЬ в чате. Твоя основная задача — сформировать варианты ответов, которые пользователь может отправить в чате. Все предложения должны быть от первого лица (я, мне, мой). " +
                     "Твоя задача - проанализировать историю переписки и предложить пользователю НЕСКОЛЬКО РАЗНЫХ вариантов того, что он МОЖЕТ НАПИСАТЬ ДАЛЬШЕ.\n\n" +
                     "❗️❗️❗️ КРИТИЧЕСКИ ВАЖНО ❗️❗️❗️\n" +
                     "1. Ты НЕ отвечаешь от своего имени. Ты предлагаешь варианты, которые пользователь (Я) может отправить собеседнику.\n" +
@@ -30,7 +30,7 @@ public abstract class BaseAIService {
                     "3. Учитывай контекст беседы и отношения между собеседниками\n" +
                     "4. Если есть изображения, просто учитывай их наличие в контексте\n" +
                     "5. Варианты должны звучать естественно, как будто их пишет реальный человек\n" +
-                    "6. Варианты должны быть более человечными, в обычном разговорном стиле. Не ставь точки в конце предложений, если это не вопрос или восклицание. Используй естественный язык, как в мессенджерах.\n\n" +
+                    "6. Варианты должны быть более человечными, в обычном разговорном стиле. Не ставь точки в конце предложений, если это не вопрос или восклицание. Используй естественный язык, как в мессенджерах. Используй казуальный, разговорный стиль, как в повседневном общении. Избегай частого использования препинания (запятых, точек), чтобы текст выглядел более естественно и непринужденно.\n7. Все варианты должны быть сформулированы от первого лица (я, мне, мой) и готовы к отправке пользователем.\n8. Общайся на том же языке, на котором ведётся чат. Если в истории переписки используется несколько языков, выбирай язык последнего сообщения или язык, который преобладает.\n\n" +
                     "Отвечай ТОЛЬКО в формате JSON со следующими полями:\n" +
                     "{\n" +
                     "  \"suggestions\": [\n" +
@@ -224,28 +224,28 @@ public abstract class BaseAIService {
         }
 
         // Добавляем информацию о используемом сервисе и модели
-        history.append("🤖 ИСПОЛЬЗУЕТСЯ: ").append(getServiceName()).append("\n");
-        history.append("📊 МОДЕЛЬ: ").append(getModelById(getModel()).displayName).append("\n\n");
+        history.append("ИСПОЛЬЗУЕТСЯ: ").append(getServiceName()).append("\n");
+        history.append("МОДЕЛЬ: ").append(getModelById(getModel()).displayName).append("\n\n");
 
         // Добавляем пользовательский промпт если есть
         if (!TextUtils.isEmpty(userPrompt)) {
-            history.append("📝 ИНСТРУКЦИЯ ОТ ПОЛЬЗОВАТЕЛЯ: ").append(userPrompt).append("\n\n");
+            history.append("ИНСТРУКЦИЯ ОТ ПОЛЬЗОВАТЕЛЯ: ").append(userPrompt).append("\n\n");
         }
 
         // Промпты из UserPromptService больше не добавляются здесь, они включены в системный промпт
 
         // Добавляем информацию о чате
         history.append("========== ИНФОРМАЦИЯ О ЧАТЕ ==========\n");
-        history.append("👤 Я (бот): ").append(myName).append("\n");
-        history.append("🗣 КОМУ ПОМОГАЕМ: ").append(interlocutorName).append("\n");
+        history.append("Я (бот): ").append(myName).append("\n");
+        history.append("КОМУ ПОМОГАЕМ: ").append(interlocutorName).append("\n");
 
         // Определяем тип чата
         boolean isGroupChat = isGroupChat(messages);
         if (isGroupChat) {
-            history.append("👥 ТИП ЧАТА: Групповой\n");
+            history.append("ТИП ЧАТА: Групповой\n");
             addGroupParticipants(history, messages);
         } else {
-            history.append("💬 ТИП ЧАТА: Личный\n");
+            history.append("ТИП ЧАТА: Личный\n");
         }
 
         // Анализ последнего сообщения
@@ -255,11 +255,11 @@ public abstract class BaseAIService {
 
         history.append("\n========== ТЕКУЩАЯ СИТУАЦИЯ ==========\n");
         if (lastMessageIsFromInterlocutor) {
-            history.append("📨 ").append(interlocutorName).append(" написал последнее сообщение\n");
-            history.append("👉 Задача: предложить варианты ПРОДОЛЖЕНИЯ разговора\n");
+            history.append("").append(interlocutorName).append(" написал последнее сообщение\n");
+            history.append("Задача: предложить варианты ПРОДОЛЖЕНИЯ разговора\n");
         } else {
-            history.append("📨 ").append(getSenderNameFromId(lastMessage.getSenderId())).append(" написал последнее сообщение\n");
-            history.append("👉 Задача: предложить варианты ОТВЕТА от лица ").append(interlocutorName).append("\n");
+            history.append("").append(getSenderNameFromId(lastMessage.getSenderId())).append(" написал последнее сообщение\n");
+            history.append("Задача: предложить варианты ОТВЕТА от лица ").append(interlocutorName).append("\n");
         }
 
         // История сообщений
@@ -272,24 +272,18 @@ public abstract class BaseAIService {
             String text = getMessageText(msg);
 
             if (i == messages.size() - 1) {
-                history.append("🔴 [ПОСЛЕДНЕЕ] ");
+                history.append("[ПОСЛЕДНЕЕ] ");
             } else if (i == messages.size() - 2) {
-                history.append("🟠 [ПРЕДПОСЛЕДНЕЕ] ");
+                history.append("[ПРЕДПОСЛЕДНЕЕ] ");
             }
 
             history.append(sender).append(": ").append(text).append("\n");
-
-            // Добавляем инфо о медиа
-            if (msg.isPhoto()) history.append("   📸 [ФОТО]\n");
-            else if (msg.isVideo()) history.append("   🎥 [ВИДЕО]\n");
-            else if (msg.isVoice()) history.append("   🎤 [ГОЛОСОВОЕ]\n");
-            else if (msg.isSticker()) history.append("   🎯 [СТИКЕР]\n");
         }
 
         history.append("\n========== ТРЕБОВАНИЯ К ОТВЕТУ ==========\n");
-        history.append("✅ Предложи 3-5 РАЗНЫХ вариантов от лица ").append(interlocutorName).append("\n");
-        history.append("✅ Используй 'я', 'мне', 'моё' (от первого лица)\n");
-        history.append("✅ Ответ только в JSON формате\n");
+        history.append("ПРЕДЛОЖИ 3-5 РАЗНЫХ ВАРИАНТОВ ОТ ЛИЦА ").append(interlocutorName).append("\n");
+        history.append("ОБЯЗАТЕЛЬНО используй 'я', 'мне', 'моё' (от первого лица)\n");
+        history.append("ОТВЕТ ТОЛЬКО В JSON ФОРМАТЕ\n");
 
         return history.toString();
     }
@@ -320,11 +314,11 @@ public abstract class BaseAIService {
     protected String getSenderName(MessageObject message, long myId, String myName, String interlocutorName, long interlocutorId) {
         long senderId = message.getSenderId();
         if (senderId == myId) {
-            return "👤 " + myName + " (Я)";
+            return myName + " (Я)";
         } else if (senderId == interlocutorId) {
-            return "🗣 " + interlocutorName + " (СОБЕСЕДНИК)";
+            return interlocutorName + " (СОБЕСЕДНИК)";
         } else {
-            return "👥 " + getSenderNameFromId(senderId) + " (УЧАСТНИК)";
+            return getSenderNameFromId(senderId) + " (УЧАСТНИК)";
         }
     }
 
@@ -352,14 +346,87 @@ public abstract class BaseAIService {
     }
 
     protected String getMessageText(MessageObject message) {
+        String caption = null;
         if (message.messageText != null && !TextUtils.isEmpty(message.messageText.toString())) {
-            return message.messageText.toString();
-        } else if (message.isPhoto()) return "[Фото]";
-        else if (message.isVideo()) return "[Видео]";
-        else if (message.isVoice()) return "[Голосовое]";
-        else if (message.isSticker()) return "[Стикер]";
-        else if (message.isGif()) return "[GIF]";
-        else return "[Медиа]";
+            caption = message.messageText.toString();
+        }
+
+        if (message.isPhoto()) {
+            return caption != null ? "[Фото] Подпись: " + caption : "[Фото]";
+        } else if (message.isVideo()) {
+            return caption != null ? "[Видео] Подпись: " + caption : "[Видео]";
+        } else if (message.isVoice()) {
+            return "[Голосовое]";
+        } else if (message.isSticker()) {
+            // Получаем эмодзи стикера напрямую из MessageObject
+            String stickerEmoji = getStickerEmoji(message);
+            if (stickerEmoji != null && !stickerEmoji.isEmpty()) {
+                return stickerEmoji + " [Стикер]";
+            } else {
+                return "[Стикер]";
+            }
+        } else if (message.isGif()) {
+            return "[GIF]";
+        } else if (caption != null) {
+            return caption;
+        } else {
+            return "[Медиа]";
+        }
+    }
+
+    // Метод для получения эмодзи стикера
+    private String getStickerEmoji(MessageObject message) {
+        try {
+            // Получаем документ стикера
+            TLRPC.Document document = message.getDocument();
+            if (document != null) {
+                // Ищем атрибут стикера
+                for (TLRPC.DocumentAttribute attribute : document.attributes) {
+                    if (attribute instanceof TLRPC.TL_documentAttributeSticker) {
+                        TLRPC.TL_documentAttributeSticker stickerAttr = (TLRPC.TL_documentAttributeSticker) attribute;
+
+                        // В TL_documentAttributeSticker есть поле alt - это и есть закрепленный эмодзи
+                        // Также может быть поле emoji в некоторых версиях
+                        if (stickerAttr.alt != null && !stickerAttr.alt.isEmpty()) {
+                            return stickerAttr.alt;
+                        }
+
+                        // Проверяем также поле emoji, если оно существует
+                        // (зависит от версии TL схемы)
+                        try {
+                            java.lang.reflect.Field emojiField = stickerAttr.getClass().getField("emoji");
+                            if (emojiField != null) {
+                                String emoji = (String) emojiField.get(stickerAttr);
+                                if (emoji != null && !emoji.isEmpty()) {
+                                    return emoji;
+                                }
+                            }
+                        } catch (Exception e) {
+                            // Поле emoji может отсутствовать - игнорируем
+                        }
+
+                        break;
+                    }
+                }
+
+                // Альтернативный способ через getStickerEmoji из MessageObject
+                // если такой метод существует
+                try {
+                    java.lang.reflect.Method getStickerEmojiMethod = message.getClass().getMethod("getStickerEmoji");
+                    if (getStickerEmojiMethod != null) {
+                        String emoji = (String) getStickerEmojiMethod.invoke(message);
+                        if (emoji != null && !emoji.isEmpty()) {
+                            return emoji;
+                        }
+                    }
+                } catch (Exception e) {
+                    // Метод может отсутствовать - игнорируем
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e("Error getting sticker emoji: " + e.getMessage());
+        }
+        return null;
     }
 
     protected void addGroupParticipants(StringBuilder history, ArrayList<MessageObject> messages) {
