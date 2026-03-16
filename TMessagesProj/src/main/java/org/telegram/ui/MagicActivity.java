@@ -50,6 +50,7 @@ public class MagicActivity extends BaseFragment {
     private RadialProgressView progressView;
     private FrameLayout progressContainer;
     private TextView serviceInfoView;
+    private View explanationView;
 
     public MagicActivity() {
         super();
@@ -427,7 +428,9 @@ public class MagicActivity extends BaseFragment {
         suggestionsContainer.setVisibility(View.GONE);
         suggestionsContainer.setAlpha(0f);
         errorTextView.setVisibility(View.GONE);
-        suggestionsContainer.removeAllViews();
+        if (suggestionsContainer.getChildCount() == 0) {
+            suggestionsContainer.removeAllViews();
+        }
 
         // Анимация вращения прогресса
         progressView.setProgress(0f);
@@ -480,14 +483,22 @@ public class MagicActivity extends BaseFragment {
             // Добавляем предложения
             if (response.has("suggestions")) {
                 JSONArray suggestions = response.getJSONArray("suggestions");
+                // Вычисляем количество уже существующих предложений (исключая explanation)
+                int existingCount = 0;
+                for (int j = 0; j < suggestionsContainer.getChildCount(); j++) {
+                    View child = suggestionsContainer.getChildAt(j);
+                    if (child != explanationView) {
+                        existingCount++;
+                    }
+                }
                 for (int i = 0; i < suggestions.length(); i++) {
                     JSONObject suggestion = suggestions.getJSONObject(i);
                     addSuggestionView(
                             suggestion.getString("text"),
                             suggestion.getString("type"),
                             suggestion.getDouble("confidence"),
-                            i,
-                            suggestions.length()
+                            existingCount + i,
+                            existingCount + suggestions.length()
                     );
                 }
             }
@@ -509,6 +520,11 @@ public class MagicActivity extends BaseFragment {
         Context context = getParentActivity();
         if (context == null) return;
 
+        // Если explanation уже есть, не добавляем повторно
+        if (explanationView != null && explanationView.getParent() == suggestionsContainer) {
+            return;
+        }
+
         LinearLayout explanationLayout = new LinearLayout(context);
         explanationLayout.setOrientation(LinearLayout.HORIZONTAL);
         explanationLayout.setBackgroundDrawable(Theme.createRoundRectDrawable(
@@ -529,14 +545,17 @@ public class MagicActivity extends BaseFragment {
         emojiView.setTextSize(20);
         explanationLayout.addView(emojiView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
 
-        TextView explanationView = new TextView(context);
-        explanationView.setText(explanation);
-        explanationView.setTextSize(14);
-        explanationView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-        explanationView.setPadding(AndroidUtilities.dp(10), 0, 0, 0);
-        explanationView.setMaxLines(3);
-        explanationView.setEllipsize(TextUtils.TruncateAt.END);
-        explanationLayout.addView(explanationView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+        TextView explanationTextView = new TextView(context);
+        explanationTextView.setText(explanation);
+        explanationTextView.setTextSize(14);
+        explanationTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        explanationTextView.setPadding(AndroidUtilities.dp(10), 0, 0, 0);
+        explanationTextView.setMaxLines(3);
+        explanationTextView.setEllipsize(TextUtils.TruncateAt.END);
+        explanationLayout.addView(explanationTextView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+
+        // Сохраняем ссылку на explanation view
+        explanationView = explanationLayout;
 
         // Анимация появления
         explanationLayout.setAlpha(0f);

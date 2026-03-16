@@ -5,11 +5,13 @@ import android.text.TextUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.openAI.UserPromptService;
 import org.telegram.tgnet.TLRPC;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -17,43 +19,43 @@ import java.util.Set;
 public abstract class BaseAIService {
 
     protected static final String SYSTEM_PROMPT =
-            "Ты - креативный помощник, который помогает пользователю мессенджера придумать, ЧТО ОТВЕТИТЬ в чате. Твоя основная задача — сформировать варианты ответов, которые пользователь может отправить в чате. Все предложения должны быть от первого лица (я, мне, мой). " +
-                    "Твоя задача - проанализировать историю переписки и предложить пользователю НЕСКОЛЬКО РАЗНЫХ вариантов того, что он МОЖЕТ НАПИСАТЬ ДАЛЬШЕ.\n\n" +
-                    "❗️❗️❗️ КРИТИЧЕСКИ ВАЖНО ❗️❗️❗️\n" +
-                    "1. Ты НЕ отвечаешь от своего имени. Ты предлагаешь варианты, которые пользователь (Я) может отправить собеседнику.\n" +
-                    "2. ВНИМАТЕЛЬНО СМОТРИ КТО НАПИСАЛ ПОСЛЕДНЕЕ СООБЩЕНИЕ:\n" +
-                    "   - Если последнее сообщение от СОБЕСЕДНИКА → мне нужно ОТВЕТИТЬ ему\n" +
-                    "   - Если последнее сообщение от МЕНЯ → значит я уже что-то написал, и теперь нужно ПРОДОЛЖИТЬ разговор (добавить еще сообщение)\n\n" +
-                    "ВАЖНЫЕ ТРЕБОВАНИЯ:\n" +
-                    "1. Всегда предлагай МИНИМУМ 3-5 различных вариантов ответа\n" +
-                    "2. Варианты должны быть РАЗНЫМИ по стилю и содержанию\n" +
-                    "3. Учитывай контекст беседы и отношения между собеседниками\n" +
-                    "4. Если есть изображения, просто учитывай их наличие в контексте\n" +
-                    "5. Варианты должны звучать естественно, как будто их пишет реальный человек\n" +
-                    "6. Варианты должны быть более человечными, в обычном разговорном стиле. Не ставь точки в конце предложений, если это не вопрос или восклицание. Используй естественный язык, как в мессенджерах. Используй казуальный, разговорный стиль, как в повседневном общении. Избегай частого использования препинания (запятых, точек), чтобы текст выглядел более естественно и непринужденно.\n7. Все варианты должны быть сформулированы от первого лица (я, мне, мой) и готовы к отправке пользователем.\n8. Общайся на том же языке, на котором ведётся чат. Если в истории переписки используется несколько языков, выбирай язык последнего сообщения или язык, который преобладает.\n\n" +
-                    "Отвечай ТОЛЬКО в формате JSON со следующими полями:\n" +
+            "You are a creative assistant that helps a messenger user come up with WHAT TO REPLY in a chat. Your main task is to formulate response options that the user can send in the chat. All suggestions must be in first person (I, me, my). " +
+                    "Your task is to analyze the conversation history and suggest to the user SEVERAL DIFFERENT options of what they CAN WRITE NEXT.\n\n" +
+                    "❗️❗️❗️ CRITICALLY IMPORTANT ❗️❗️❗️\n" +
+                    "1. You DO NOT respond on your own behalf. You suggest options that the user (I) can send to the interlocutor.\n" +
+                    "2. CAREFULLY LOOK AT WHO WROTE THE LAST MESSAGE:\n" +
+                    "   - If the last message is from the INTERLOCUTOR → I need to REPLY to them\n" +
+                    "   - If the last message is from ME → that means I already wrote something, and now I need to CONTINUE the conversation (add another message)\n\n" +
+                    "IMPORTANT REQUIREMENTS:\n" +
+                    "1. Always suggest AT LEAST 3-5 different response options\n" +
+                    "2. Options must be DIFFERENT in style and content\n" +
+                    "3. Consider the conversation context and relationship between interlocutors\n" +
+                    "4. If there are images, simply consider their presence in the context\n" +
+                    "5. Options should sound natural, as if written by a real person\n" +
+                    "6. Options should be more human-like, in a normal conversational style. Do not put periods at the end of sentences unless it's a question or exclamation. Use natural language as in messengers. Use a casual, conversational style as in everyday communication. Avoid frequent use of punctuation (commas, periods) to make the text look more natural and relaxed.\n7. All options must be formulated in first person (I, me, my) and ready to be sent by the user.\n8. Communicate in the same language as the chat. If the conversation history uses multiple languages, choose the language of the last message or the language that predominates. If it's unclear which language to use, write in the language selected in the app settings (app language).\n\n" +
+                    "Respond ONLY in JSON format with the following fields:\n" +
                     "{\n" +
                     "  \"suggestions\": [\n" +
                     "    {\n" +
-                    "      \"text\": \"текст, который Я МОГУ ОТПРАВИТЬ\",\n" +
-                    "      \"confidence\": 0.95 (число от 0 до 1, насколько этот вариант уместен),\n" +
-                    "      \"type\": \"answer\" (прямой ответ), \"question\" (вопрос), \"continuation\" (продолжение темы), \"humor\" (с юмором), \"emoji\" (с эмодзи)\n" +
+                    "      \"text\": \"text that I CAN SEND\",\n" +
+                    "      \"confidence\": 0.95 (a number from 0 to 1, how appropriate this option is),\n" +
+                    "      \"type\": \"answer\" (direct answer), \"question\" (question), \"continuation\" (topic continuation), \"humor\" (with humor), \"emoji\" (with emoji)\n" +
                     "    },\n" +
-                    "    ... (еще минимум 2-4 варианта)\n" +
+                    "    ... (at least 2-4 more options)\n" +
                     "  ],\n" +
-                    "  \"explanation\": \"краткое объяснение контекста и почему эти варианты уместны\"\n" +
+                    "  \"explanation\": \"brief explanation of context and why these options are appropriate\"\n" +
                     "}\n\n" +
-                    "ПРИМЕР хорошего ответа (обрати внимание - варианты от лица пользователя):\n" +
+                    "EXAMPLE of a good response (note - options from the user's perspective):\n" +
                     "{\n" +
                     "  \"suggestions\": [\n" +
-                    "    {\"text\": \"Да, я тоже так думаю\", \"confidence\": 0.9, \"type\": \"answer\"},\n" +
-                    "    {\"text\": \"А что ты думаешь по этому поводу?\", \"confidence\": 0.85, \"type\": \"question\"},\n" +
-                    "    {\"text\": \"Кстати, это напомнило мне одну историю...\", \"confidence\": 0.7, \"type\": \"continuation\"},\n" +
-                    "    {\"text\": \"😄 Классно звучит!\", \"confidence\": 0.8, \"type\": \"emoji\"}\n" +
+                    "    {\"text\": \"Yes, I think so too\", \"confidence\": 0.9, \"type\": \"answer\"},\n" +
+                    "    {\"text\": \"What do you think about this?\", \"confidence\": 0.85, \"type\": \"question\"},\n" +
+                    "    {\"text\": \"By the way, this reminded me of a story...\", \"confidence\": 0.7, \"type\": \"continuation\"},\n" +
+                    "    {\"text\": \"😄 Sounds great!\", \"confidence\": 0.8, \"type\": \"emoji\"}\n" +
                     "  ],\n" +
-                    "  \"explanation\": \"Разные варианты: согласие, вопрос для продолжения, переход к истории и эмоциональная реакция\"\n" +
+                    "  \"explanation\": \"Different options: agreement, question to continue, transition to a story, and emotional reaction\"\n" +
                     "}\n\n" +
-                    "Важно: НИКОГДА не возвращай меньше 3 вариантов. Ответ должен быть только в JSON формате.";
+                    "Important: NEVER return fewer than 3 options. The response must be only in JSON format.";
 
     protected int currentAccount;
     protected AISettings aiSettings;
@@ -69,28 +71,28 @@ public abstract class BaseAIService {
     protected String getEnhancedSystemPrompt(long interlocutorId) {
         StringBuilder enhanced = new StringBuilder();
         enhanced.append(SYSTEM_PROMPT);
-        
+
         String custom = aiSettings.getSystemPrompt();
         if (custom != null && !custom.isEmpty()) {
-            enhanced.append("\n\n").append("=== БАЗОВЫЙ ПОЛЬЗОВАТЕЛЬСКИЙ ПРОМПТ ===\n").append(custom);
+            enhanced.append("\n\n").append("=== BASE USER PROMPT ===\n").append(custom);
         }
-        
+
         UserPromptService promptService = UserPromptService.getInstance(currentAccount);
-        
-        // Промпт для себя
+
+        // Prompt for myself
         String myPrompt = promptService.getCurrentUserPrompt();
         if (!TextUtils.isEmpty(myPrompt)) {
-            enhanced.append("\n\n").append("=== МОЙ ПРОМПТ ===\n").append(myPrompt);
+            enhanced.append("\n\n").append("=== MY PROMPT ===\n").append(myPrompt);
         }
-        
-        // Промпт для собеседника (если есть)
+
+        // Prompt for interlocutor (if any)
         if (interlocutorId > 0) {
             String interlocutorPrompt = promptService.getPrompt(interlocutorId);
             if (!TextUtils.isEmpty(interlocutorPrompt)) {
-                enhanced.append("\n\n").append("=== ПРОМПТ ДЛЯ СОБЕСЕДНИКА ===\n").append(interlocutorPrompt);
+                enhanced.append("\n\n").append("=== INTERLOCUTOR PROMPT ===\n").append(interlocutorPrompt);
             }
         }
-        
+
         return enhanced.toString();
     }
 
@@ -174,7 +176,7 @@ public abstract class BaseAIService {
     // Общая логика генерации запроса
     public void generateSuggestions(ArrayList<MessageObject> messages, String userPrompt, Callback callback) {
         if (!hasValidConfig()) {
-            callback.onError(getServiceName() + " не настроен. Пожалуйста, проверьте настройки.");
+            callback.onError(getServiceName() + " is not configured. Please check settings.");
             return;
         }
 
@@ -198,7 +200,7 @@ public abstract class BaseAIService {
 
         } catch (Exception e) {
             FileLog.e("Error creating request: " + e.getMessage());
-            callback.onError("Ошибка при создании запроса: " + e.getMessage());
+            callback.onError("Error creating request: " + e.getMessage());
         }
     }
 
@@ -213,9 +215,9 @@ public abstract class BaseAIService {
         long currentUserId = UserConfig.getInstance(currentAccount).getClientUserId();
 
         TLRPC.User currentUser = UserConfig.getInstance(currentAccount).getCurrentUser();
-        String myName = currentUser != null ? getDisplayName(currentUser) : "Я (бот)";
+        String myName = currentUser != null ? getDisplayName(currentUser) : "Me (bot)";
 
-        String interlocutorName = "СОБЕСЕДНИК";
+        String interlocutorName = "INTERLOCUTOR";
         if (interlocutorId > 0) {
             TLRPC.User interlocutor = MessagesController.getInstance(currentAccount).getUser(interlocutorId);
             if (interlocutor != null) {
@@ -223,29 +225,29 @@ public abstract class BaseAIService {
             }
         }
 
-        // Добавляем информацию о используемом сервисе и модели
-        history.append("ИСПОЛЬЗУЕТСЯ: ").append(getServiceName()).append("\n");
-        history.append("МОДЕЛЬ: ").append(getModelById(getModel()).displayName).append("\n\n");
-
-        // Добавляем пользовательский промпт если есть
+        // Add user prompt if any
         if (!TextUtils.isEmpty(userPrompt)) {
-            history.append("ИНСТРУКЦИЯ ОТ ПОЛЬЗОВАТЕЛЯ: ").append(userPrompt).append("\n\n");
+            history.append("USER INSTRUCTION: ").append(userPrompt).append("\n\n");
         }
 
         // Промпты из UserPromptService больше не добавляются здесь, они включены в системный промпт
 
-        // Добавляем информацию о чате
-        history.append("========== ИНФОРМАЦИЯ О ЧАТЕ ==========\n");
-        history.append("Я (бот): ").append(myName).append("\n");
-        history.append("КОМУ ПОМОГАЕМ: ").append(interlocutorName).append("\n");
+        // Add chat information
+        history.append("========== CHAT INFO ==========\n");
+        history.append("Me (bot): ").append(myName).append("\n");
+        history.append("HELPING: ").append(interlocutorName).append("\n");
+        // Add app language
+        Locale currentLocale = LocaleController.getInstance().getCurrentLocale();
+        String appLanguage = currentLocale.getDisplayLanguage(Locale.ENGLISH);
+        history.append("APP LANGUAGE: ").append(appLanguage).append("\n");
 
-        // Определяем тип чата
+        // Determine chat type
         boolean isGroupChat = isGroupChat(messages);
         if (isGroupChat) {
-            history.append("ТИП ЧАТА: Групповой\n");
+            history.append("CHAT TYPE: Group\n");
             addGroupParticipants(history, messages);
         } else {
-            history.append("ТИП ЧАТА: Личный\n");
+            history.append("CHAT TYPE: Private\n");
         }
 
         // Анализ последнего сообщения
@@ -253,18 +255,18 @@ public abstract class BaseAIService {
         boolean lastMessageIsFromInterlocutor = lastMessage.getSenderId() == interlocutorId;
         boolean lastMessageIsFromMe = lastMessage.getSenderId() == currentUserId;
 
-        history.append("\n========== ТЕКУЩАЯ СИТУАЦИЯ ==========\n");
+        history.append("\n========== CURRENT SITUATION ==========\n");
         if (lastMessageIsFromInterlocutor) {
-            history.append("").append(interlocutorName).append(" написал последнее сообщение\n");
-            history.append("Задача: предложить варианты ПРОДОЛЖЕНИЯ разговора\n");
+            history.append("").append(interlocutorName).append(" wrote the last message\n");
+            history.append("Task: suggest CONTINUATION options\n");
         } else {
-            history.append("").append(getSenderNameFromId(lastMessage.getSenderId())).append(" написал последнее сообщение\n");
-            history.append("Задача: предложить варианты ОТВЕТА от лица ").append(interlocutorName).append("\n");
+            history.append("").append(getSenderNameFromId(lastMessage.getSenderId())).append(" wrote the last message\n");
+            history.append("Task: suggest REPLY options on behalf of ").append(interlocutorName).append("\n");
         }
 
-        // История сообщений
-        history.append("\n========== ИСТОРИЯ ПЕРЕПИСКИ ==========\n");
-        history.append("(Сообщения идут от старых к новым)\n\n");
+        // Message history
+        history.append("\n========== CONVERSATION HISTORY ==========\n");
+        history.append("(Messages from oldest to newest)\n\n");
 
         for (int i = 0; i < messages.size(); i++) {
             MessageObject msg = messages.get(i);
@@ -272,18 +274,18 @@ public abstract class BaseAIService {
             String text = getMessageText(msg);
 
             if (i == messages.size() - 1) {
-                history.append("[ПОСЛЕДНЕЕ] ");
+                history.append("[LAST] ");
             } else if (i == messages.size() - 2) {
-                history.append("[ПРЕДПОСЛЕДНЕЕ] ");
+                history.append("[SECOND LAST] ");
             }
 
             history.append(sender).append(": ").append(text).append("\n");
         }
 
-        history.append("\n========== ТРЕБОВАНИЯ К ОТВЕТУ ==========\n");
-        history.append("ПРЕДЛОЖИ 3-5 РАЗНЫХ ВАРИАНТОВ ОТ ЛИЦА ").append(interlocutorName).append("\n");
-        history.append("ОБЯЗАТЕЛЬНО используй 'я', 'мне', 'моё' (от первого лица)\n");
-        history.append("ОТВЕТ ТОЛЬКО В JSON ФОРМАТЕ\n");
+        history.append("\n========== RESPONSE REQUIREMENTS ==========\n");
+        history.append("SUGGEST 3-5 DIFFERENT OPTIONS ON BEHALF OF ").append(interlocutorName).append("\n");
+        history.append("MUST use 'I', 'me', 'my' (first person)\n");
+        history.append("RESPONSE ONLY IN JSON FORMAT\n");
 
         return history.toString();
     }
@@ -314,11 +316,11 @@ public abstract class BaseAIService {
     protected String getSenderName(MessageObject message, long myId, String myName, String interlocutorName, long interlocutorId) {
         long senderId = message.getSenderId();
         if (senderId == myId) {
-            return myName + " (Я)";
+            return myName + " (Me)";
         } else if (senderId == interlocutorId) {
-            return interlocutorName + " (СОБЕСЕДНИК)";
+            return interlocutorName + " (INTERLOCUTOR)";
         } else {
-            return getSenderNameFromId(senderId) + " (УЧАСТНИК)";
+            return getSenderNameFromId(senderId) + " (PARTICIPANT)";
         }
     }
 
@@ -334,15 +336,15 @@ public abstract class BaseAIService {
         } catch (Exception e) {
             FileLog.e("Error getting name: " + e.getMessage());
         }
-        return "Пользователь";
+        return "User";
     }
 
     protected String getDisplayName(TLRPC.User user) {
-        if (user == null) return "Пользователь";
+        if (user == null) return "User";
         String name = user.first_name;
         if (!TextUtils.isEmpty(user.last_name)) name += " " + user.last_name;
         if (TextUtils.isEmpty(name)) name = user.username;
-        return TextUtils.isEmpty(name) ? "Пользователь" : name;
+        return TextUtils.isEmpty(name) ? "User" : name;
     }
 
     protected String getMessageText(MessageObject message) {
@@ -352,27 +354,35 @@ public abstract class BaseAIService {
         }
 
         if (message.isPhoto()) {
-            return caption != null ? "[Фото] Подпись: " + caption : "[Фото]";
+            return caption != null ? "[Photo] Caption: " + caption : "[Photo]";
         } else if (message.isVideo()) {
-            return caption != null ? "[Видео] Подпись: " + caption : "[Видео]";
+            return caption != null ? "[Video] Caption: " + caption : "[Video]";
         } else if (message.isVoice()) {
-            return "[Голосовое]";
+            // Проверяем наличие расшифровки голосового сообщения
+            String transcription = getVoiceTranscription(message);
+            if (transcription != null && !transcription.isEmpty()) {
+                return "[Voice] Transcription: " + transcription;
+            } else {
+                return "[Voice]";
+            }
         } else if (message.isSticker()) {
-            // Получаем эмодзи стикера напрямую из MessageObject
+            // Get sticker emoji directly from MessageObject
             String stickerEmoji = getStickerEmoji(message);
             if (stickerEmoji != null && !stickerEmoji.isEmpty()) {
-                return stickerEmoji + " [Стикер]";
+                return stickerEmoji;
             } else {
-                return "[Стикер]";
+                return "[Sticker]";
             }
         } else if (message.isGif()) {
             return "[GIF]";
         } else if (caption != null) {
             return caption;
         } else {
-            return "[Медиа]";
+            return "[Media]";
         }
     }
+
+
 
     // Метод для получения эмодзи стикера
     private String getStickerEmoji(MessageObject message) {
@@ -429,12 +439,124 @@ public abstract class BaseAIService {
         return null;
     }
 
+
+    private String getVoiceTranscription(MessageObject message) {
+        try {
+            // Пытаемся получить расшифровку через рефлексию, так как прямой метод может отсутствовать
+            try {
+                // Метод 1: getTranscription (если существует)
+                java.lang.reflect.Method getTranscriptionMethod = message.getClass().getMethod("getTranscription");
+                if (getTranscriptionMethod != null) {
+                    Object transcription = getTranscriptionMethod.invoke(message);
+                    if (transcription != null && transcription instanceof CharSequence) {
+                        String text = transcription.toString();
+                        if (!TextUtils.isEmpty(text)) {
+                            return text;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Метод может отсутствовать - пробуем следующий способ
+            }
+
+            // Метод 2: проверяем через messageObject.getDocument() и атрибуты
+            TLRPC.Document document = message.getDocument();
+            if (document != null) {
+                // Ищем атрибут с транскрипцией (если такой есть в вашей версии Telegram)
+                for (TLRPC.DocumentAttribute attribute : document.attributes) {
+                    // В некоторых версиях может быть специальный атрибут для транскрипции
+                    // Проверяем наличие поля transcriptionText через рефлексию
+                    try {
+                        java.lang.reflect.Field transcriptionField = attribute.getClass().getField("transcriptionText");
+                        if (transcriptionField != null) {
+                            String transcription = (String) transcriptionField.get(attribute);
+                            if (transcription != null && !transcription.isEmpty()) {
+                                return transcription;
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Поле может отсутствовать - игнорируем
+                    }
+                }
+            }
+
+            // Метод 3: проверяем через getMedia() если есть
+            try {
+                java.lang.reflect.Method getMediaMethod = message.getClass().getMethod("getMedia");
+                if (getMediaMethod != null) {
+                    Object media = getMediaMethod.invoke(message);
+                    if (media != null) {
+                        // Пытаемся найти транскрипцию в media
+                        java.lang.reflect.Method getTranscriptionMethod = media.getClass().getMethod("getTranscription");
+                        if (getTranscriptionMethod != null) {
+                            Object transcription = getTranscriptionMethod.invoke(media);
+                            if (transcription != null && transcription instanceof CharSequence) {
+                                String text = transcription.toString();
+                                if (!TextUtils.isEmpty(text)) {
+                                    return text;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Метод может отсутствовать
+            }
+
+            // Метод 4: проверяем наличие расшифровки в messageObject.transcription (если такое поле существует)
+            try {
+                java.lang.reflect.Field transcriptionField = message.getClass().getField("transcription");
+                if (transcriptionField != null) {
+                    Object transcription = transcriptionField.get(message);
+                    if (transcription != null && transcription instanceof CharSequence) {
+                        String text = transcription.toString();
+                        if (!TextUtils.isEmpty(text)) {
+                            return text;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Поле может отсутствовать
+            }
+
+            // Метод 5: проверяем наличие расшифровки в атрибутах документа через getAttributes()
+            try {
+                java.lang.reflect.Method getAttributesMethod = document.getClass().getMethod("getAttributes");
+                if (getAttributesMethod != null) {
+                    ArrayList<?> attributes = (ArrayList<?>) getAttributesMethod.invoke(document);
+                    for (Object attr : attributes) {
+                        // Проверяем, есть ли поле transcriptionText в атрибуте
+                        try {
+                            java.lang.reflect.Field textField = attr.getClass().getField("text");
+                            if (textField != null) {
+                                String text = (String) textField.get(attr);
+                                if (text != null && !text.isEmpty()) {
+                                    return text;
+                                }
+                            }
+                        } catch (Exception e) {
+                            // Поле может отсутствовать
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Метод может отсутствовать
+            }
+
+        } catch (Exception e) {
+            FileLog.e("Error getting voice transcription: " + e.getMessage());
+        }
+        return null;
+    }
+
+
+
     protected void addGroupParticipants(StringBuilder history, ArrayList<MessageObject> messages) {
         Set<Long> participants = new HashSet<>();
         for (MessageObject msg : messages) {
             participants.add(msg.getSenderId());
         }
-        history.append("УЧАСТНИКИ:\n");
+        history.append("PARTICIPANTS:\n");
         for (Long id : participants) {
             history.append("  • ").append(getSenderNameFromId(id)).append("\n");
         }
@@ -467,7 +589,7 @@ public abstract class BaseAIService {
     public JSONObject createDefaultResponse() {
         JSONObject suggestion = new JSONObject();
         try {
-            suggestion.put("text", "Да, я согласен");
+            suggestion.put("text", "Yes, I agree");
             suggestion.put("confidence", 0.8);
             suggestion.put("type", "answer");
         } catch (Exception e) {
