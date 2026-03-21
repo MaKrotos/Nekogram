@@ -52,6 +52,8 @@ public class MagicActivity extends BaseFragment {
     private TextView serviceInfoView;
     private View explanationView;
     private boolean isGenerating = false;
+    private boolean hasGenerated = false;
+    private TextView tokensProgressView;
 
     public MagicActivity() {
         super();
@@ -63,14 +65,17 @@ public class MagicActivity extends BaseFragment {
 
     private void updateService() {
         aiService = AIServiceFactory.createService(currentAccount);
+        hasGenerated = false;
     }
 
     public void setSelectedMessages(ArrayList<MessageObject> messages) {
         this.selectedMessages = messages;
+        hasGenerated = false;
     }
 
     public void setPromptText(String prompt) {
         this.promptText = prompt != null ? prompt : "";
+        hasGenerated = false;
     }
 
     @Override
@@ -204,6 +209,15 @@ public class MagicActivity extends BaseFragment {
         loadingTextView.setPadding(0, AndroidUtilities.dp(70), 0, 0);
         loadingTextView.setVisibility(View.GONE);
         progressContainer.addView(loadingTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+
+        // TextView для прогресса токенов
+        tokensProgressView = new TextView(context);
+        tokensProgressView.setTextSize(13);
+        tokensProgressView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        tokensProgressView.setGravity(Gravity.CENTER);
+        tokensProgressView.setPadding(0, AndroidUtilities.dp(110), 0, 0);
+        tokensProgressView.setVisibility(View.GONE);
+        progressContainer.addView(tokensProgressView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
         // TextView для ошибок
         errorTextView = new TextView(context);
@@ -387,6 +401,21 @@ public class MagicActivity extends BaseFragment {
         return layout;
     }
 
+    private void updateTokensProgress() {
+        if (tokensProgressView == null || aiService == null) return;
+        int maxTokens = aiService.getMaxTokens();
+        int generated = aiService.getGeneratedTokens();
+        String text;
+        if (maxTokens <= 0) {
+            text = "Токены: неизвестно";
+        } else if (generated >= 0) {
+            text = "Токены: " + generated + " / " + maxTokens;
+        } else {
+            text = "Макс токенов: " + maxTokens;
+        }
+        tokensProgressView.setText(text);
+    }
+
     private void openAISettings() {
         AISettingsActivity settingsActivity = new AISettingsActivity();
         presentFragment(settingsActivity);
@@ -394,6 +423,10 @@ public class MagicActivity extends BaseFragment {
 
     private void checkAndGenerateSuggestions() {
         if (isGenerating) {
+            return;
+        }
+        if (hasGenerated) {
+            // Уже сгенерировано для текущих сообщений и промпта
             return;
         }
         if (!aiSettings.hasValidConfig()) {
@@ -427,12 +460,13 @@ public class MagicActivity extends BaseFragment {
                 .start();
 
         loadingTextView.setVisibility(View.VISIBLE);
+        tokensProgressView.setVisibility(View.VISIBLE);
+        updateTokensProgress();
         suggestionsContainer.setVisibility(View.GONE);
         suggestionsContainer.setAlpha(0f);
         errorTextView.setVisibility(View.GONE);
-        if (suggestionsContainer.getChildCount() == 0) {
-            suggestionsContainer.removeAllViews();
-        }
+        suggestionsContainer.removeAllViews();
+        explanationView = null;
 
         // Анимация вращения прогресса
         progressView.setProgress(0f);
@@ -523,6 +557,7 @@ public class MagicActivity extends BaseFragment {
             showError(LocaleController.getString("ResponseProcessingError", R.string.ResponseProcessingError) + ": " + e.getMessage());
         } finally {
             isGenerating = false;
+            hasGenerated = true;
         }
     }
 
@@ -738,6 +773,7 @@ public class MagicActivity extends BaseFragment {
                 .start();
         
         isGenerating = false;
+        hasGenerated = false;
     }
 
     @Override

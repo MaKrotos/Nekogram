@@ -75,6 +75,11 @@ public class GeminiSettings extends BaseServiceSettings {
         setValue(KEY_MAX_OUTPUT_TOKENS, maxOutputTokens);
     }
 
+    @Override
+    public int getMaxTokens() {
+        return getMaxOutputTokens();
+    }
+
     public float getTopP() {
         return (float) getValue(KEY_TOP_P);
     }

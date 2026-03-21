@@ -181,6 +181,14 @@ public abstract class BaseServiceSettings {
         setValue(KEY_MODEL, model);
     }
 
+    /**
+     * Get the maximum tokens limit for this service.
+     * Default implementation returns -1 (unknown). Subclasses should override.
+     */
+    public int getMaxTokens() {
+        return -1;
+    }
+
     // Helper methods
 
     protected String getSharedPreferencesName() {

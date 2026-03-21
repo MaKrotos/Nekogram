@@ -154,6 +154,21 @@ public abstract class BaseAIService {
         return getServiceSettings().getModel();
     }
 
+    /**
+     * Get the maximum tokens limit for this service.
+     */
+    public int getMaxTokens() {
+        return getServiceSettings().getMaxTokens();
+    }
+
+    /**
+     * Get the number of tokens generated so far (if available).
+     * Default implementation returns -1 (unknown).
+     */
+    public int getGeneratedTokens() {
+        return -1;
+    }
+
     // Общая логика генерации запроса
     public void generateSuggestions(ArrayList<MessageObject> messages, String userPrompt, Callback callback) {
         if (!hasValidConfig()) {
